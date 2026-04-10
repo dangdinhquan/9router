@@ -1,5 +1,5 @@
 import {
-  extractApiKey, isValidApiKey,
+  extractApiKey, isValidApiKey, validateApiKeyAccess,
   getProviderCredentials, markAccountUnavailable,
 } from "../services/auth.js";
 import { getSettings } from "@/lib/localDb";
@@ -25,9 +25,10 @@ export async function handleTts(request) {
   const responseFormat = url.searchParams.get("response_format") || "mp3"; // mp3 (default) | json
   log.request("POST", `${url.pathname} | ${modelStr} | format=${responseFormat}`);
 
+  let apiKey = null;
   const settings = await getSettings();
   if (settings.requireApiKey) {
-    const apiKey = extractApiKey(request);
+    apiKey = extractApiKey(request);
     if (!apiKey) return errorResponse(HTTP_STATUS.UNAUTHORIZED, "Missing API key");
     const valid = await isValidApiKey(apiKey);
     if (!valid) return errorResponse(HTTP_STATUS.UNAUTHORIZED, "Invalid API key");
@@ -40,6 +41,15 @@ export async function handleTts(request) {
   if (!modelInfo.provider) return errorResponse(HTTP_STATUS.BAD_REQUEST, "Invalid model format");
 
   const { provider, model } = modelInfo;
+  if (!apiKey) {
+    apiKey = extractApiKey(request);
+  }
+  if (apiKey) {
+    const keyAccess = await validateApiKeyAccess(apiKey, { providerId: provider, modelId: model });
+    if (!keyAccess.valid) {
+      return errorResponse(keyAccess.status || HTTP_STATUS.FORBIDDEN, keyAccess.reason || "API key access denied");
+    }
+  }
   log.info("ROUTING", `Provider: ${provider}, Voice: ${model}`);
 
   // noAuth providers — no credential needed

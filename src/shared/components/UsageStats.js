@@ -195,6 +195,7 @@ export default function UsageStats() {
   const [viewMode, setViewMode] = useState("costs");
   const [providers, setProviders] = useState([]);
   const [period, setPeriod] = useState("7d");
+  const [apiKeyScope, setApiKeyScope] = useState("global");
 
   // Fetch connected providers once, deduplicate by provider type
   // Always include noAuth free providers (e.g. opencode) regardless of connections
@@ -222,7 +223,7 @@ export default function UsageStats() {
     if (!stats) setLoading(true);
     else setFetching(true);
 
-    fetch(`/api/usage/stats?period=${period}`)
+    fetch(`/api/usage/stats?period=${period}&apiKeyScope=${apiKeyScope}`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data) setStats((prev) => ({ ...prev, ...data }));
@@ -232,7 +233,7 @@ export default function UsageStats() {
         setLoading(false);
         setFetching(false);
       });
-  }, [period]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [period, apiKeyScope]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // SSE connection - real-time updates for activeRequests + recentRequests only
   useEffect(() => {
@@ -398,8 +399,28 @@ export default function UsageStats() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Period selector */}
-      <div className="flex items-center gap-2 self-end">
+      {/* Top filters */}
+      <div className="flex items-center gap-2 self-end flex-wrap justify-end">
+        <div className="flex items-center gap-1 bg-bg-subtle rounded-lg p-1 border border-border">
+          <button
+            onClick={() => setApiKeyScope("global")}
+            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${apiKeyScope === "global" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:text-text hover:bg-bg-hover"}`}
+          >
+            Global
+          </button>
+          <button
+            onClick={() => setApiKeyScope("api-key")}
+            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${apiKeyScope === "api-key" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:text-text hover:bg-bg-hover"}`}
+          >
+            API Key
+          </button>
+          <button
+            onClick={() => setApiKeyScope("no-key")}
+            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${apiKeyScope === "no-key" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:text-text hover:bg-bg-hover"}`}
+          >
+            No API Key
+          </button>
+        </div>
         <div className="flex items-center gap-1 bg-bg-subtle rounded-lg p-1 border border-border">
           {PERIODS.map((p) => (
             <button

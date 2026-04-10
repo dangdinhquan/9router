@@ -4,6 +4,7 @@ import {
   clearAccountError,
   extractApiKey,
   isValidApiKey,
+  validateApiKeyAccess,
 } from "../services/auth.js";
 import { getSettings } from "@/lib/localDb";
 import { getModelInfo } from "../services/model.js";
@@ -72,6 +73,14 @@ export async function handleEmbeddings(request) {
   }
 
   const { provider, model } = modelInfo;
+
+  if (apiKey) {
+    const keyAccess = await validateApiKeyAccess(apiKey, { providerId: provider, modelId: model });
+    if (!keyAccess.valid) {
+      log.warn("AUTH", keyAccess.reason);
+      return errorResponse(keyAccess.status || HTTP_STATUS.FORBIDDEN, keyAccess.reason || "API key access denied");
+    }
+  }
 
   if (modelStr !== `${provider}/${model}`) {
     log.info("ROUTING", `${modelStr} → ${provider}/${model}`);

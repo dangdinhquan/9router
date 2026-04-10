@@ -272,6 +272,13 @@ export async function saveRequestUsage(entry) {
 
     const entryCost = await calculateCost(entry.provider, entry.model, entry.tokens);
     entry.cost = entryCost;
+    if (entry.apiKey && !entry.apiKeyId) {
+      try {
+        const { getApiKeyByKey } = await import("@/lib/localDb.js");
+        const keyInfo = await getApiKeyByKey(entry.apiKey);
+        if (keyInfo?.id) entry.apiKeyId = keyInfo.id;
+      } catch {}
+    }
     db.data.history.push(entry);
     db.data.totalRequestsLifetime += 1;
 
@@ -464,11 +471,36 @@ async function calculateCost(provider, model, tokens) {
 
 const PERIOD_MS = { "24h": 86400000, "7d": 604800000, "30d": 2592000000, "60d": 5184000000 };
 
+const API_KEY_PERIOD_MS = {
+  daily: 86400000,
+  weekly: 604800000,
+  monthly: 2592000000,
+};
+
+export async function getApiKeyPeriodUsage(apiKey, metric = "cost", quotaPeriod = "monthly") {
+  if (!apiKey) return 0;
+  const db = await getUsageDb();
+  const history = db.data.history || [];
+  const durationMs = API_KEY_PERIOD_MS[quotaPeriod] || API_KEY_PERIOD_MS.monthly;
+  const cutoff = Date.now() - durationMs;
+
+  return history.reduce((sum, entry) => {
+    if (entry.apiKey !== apiKey) return sum;
+    if (new Date(entry.timestamp).getTime() < cutoff) return sum;
+    if (metric === "tokens") {
+      const prompt = entry.tokens?.prompt_tokens || entry.tokens?.input_tokens || 0;
+      const completion = entry.tokens?.completion_tokens || entry.tokens?.output_tokens || 0;
+      return sum + prompt + completion;
+    }
+    return sum + (entry.cost || 0);
+  }, 0);
+}
+
 /**
  * Get aggregated usage stats
  * @param {"24h"|"7d"|"30d"|"60d"|"all"} period - Time period to filter
  */
-export async function getUsageStats(period = "all") {
+export async function getUsageStats(period = "all", options = {}) {
   const db = await getUsageDb();
   let history = db.data.history || [];
 
@@ -476,6 +508,12 @@ export async function getUsageStats(period = "all") {
   if (period && PERIOD_MS[period]) {
     const cutoff = Date.now() - PERIOD_MS[period];
     history = history.filter((e) => new Date(e.timestamp).getTime() >= cutoff);
+  }
+
+  if (options.apiKeyScope === "api-key") {
+    history = history.filter((e) => !!e.apiKey);
+  } else if (options.apiKeyScope === "no-key") {
+    history = history.filter((e) => !e.apiKey);
   }
 
   // Import localDb to get provider connection names and API keys
@@ -720,6 +758,7 @@ export async function getUsageStats(period = "all") {
           rawModel: entry.model,
           provider: providerDisplayName,
           apiKey: entry.apiKey,
+          apiKeyId: entry.apiKeyId || keyInfo?.id || null,
           keyName: keyName,
           apiKeyKey: apiKeyKey,
           lastUsed: entry.timestamp
@@ -746,6 +785,7 @@ export async function getUsageStats(period = "all") {
           rawModel: entry.model,
           provider: providerDisplayName,
           apiKey: null,
+          apiKeyId: null,
           keyName: keyName,
           apiKeyKey: apiKeyKey,
           lastUsed: entry.timestamp

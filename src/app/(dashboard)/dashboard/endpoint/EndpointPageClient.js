@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
 import { Card, Button, Input, Modal, CardSkeleton, Toggle } from "@/shared/components";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
+import { AI_PROVIDERS } from "@/shared/constants/providers";
 
 /* ========== CLOUD CODE — COMMENTED OUT (replaced by Tunnel) ==========
 const DEFAULT_CLOUD_URL = process.env.NEXT_PUBLIC_CLOUD_URL || "";
@@ -25,6 +26,13 @@ export default function APIPageClient({ machineId }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [createdKey, setCreatedKey] = useState(null);
+  const [modelOptions, setModelOptions] = useState([]);
+  const [editingKey, setEditingKey] = useState(null);
+  const [editQuotaMetric, setEditQuotaMetric] = useState("cost");
+  const [editQuotaPeriod, setEditQuotaPeriod] = useState("monthly");
+  const [editQuotaLimit, setEditQuotaLimit] = useState("");
+  const [editAllowedProviders, setEditAllowedProviders] = useState([]);
+  const [editAllowedModels, setEditAllowedModels] = useState([]);
 
   /* ========== CLOUD STATE — COMMENTED OUT (replaced by Tunnel) ==========
   const [cloudEnabled, setCloudEnabled] = useState(false);
@@ -56,9 +64,43 @@ export default function APIPageClient({ machineId }) {
 
   const { copied, copy } = useCopyToClipboard();
 
+  const providerOptions = useMemo(
+    () =>
+      Object.values(AI_PROVIDERS)
+        .filter((p) => !p.hidden)
+        .map((p) => ({ id: p.id, name: p.name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [],
+  );
+
+  const normalizeKeySettings = (key) => ({
+    quotaMetric: key?.quotaMetric === "tokens" ? "tokens" : "cost",
+    quotaPeriod: ["daily", "weekly", "monthly"].includes(key?.quotaPeriod) ? key.quotaPeriod : "monthly",
+    quotaLimit: key?.quotaLimit === null || key?.quotaLimit === undefined ? "" : String(key.quotaLimit),
+    allowedProviders: Array.isArray(key?.allowedProviders) ? key.allowedProviders : [],
+    allowedModels: Array.isArray(key?.allowedModels) ? key.allowedModels : [],
+  });
+
+  const fetchModelOptions = async () => {
+    try {
+      const res = await fetch("/api/models");
+      const data = await res.json();
+      if (res.ok) {
+        const options = (data.models || []).map((m) => ({
+          id: `${m.provider}/${m.model}`,
+          name: `${m.name || m.model} (${m.provider})`,
+        }));
+        setModelOptions(options);
+      }
+    } catch (error) {
+      console.log("Error fetching model options:", error);
+    }
+  };
+
   useEffect(() => {
     fetchData();
     loadSettings();
+    fetchModelOptions();
   }, []);
 
   /* ========== CLOUD FUNCTIONS — COMMENTED OUT (replaced by Tunnel) ==========
@@ -385,6 +427,49 @@ export default function APIPageClient({ machineId }) {
     }
   };
 
+  const openManageKey = (key) => {
+    const normalized = normalizeKeySettings(key);
+    setEditingKey(key);
+    setEditQuotaMetric(normalized.quotaMetric);
+    setEditQuotaPeriod(normalized.quotaPeriod);
+    setEditQuotaLimit(normalized.quotaLimit);
+    setEditAllowedProviders(normalized.allowedProviders);
+    setEditAllowedModels(normalized.allowedModels);
+  };
+
+  const closeManageKey = () => {
+    setEditingKey(null);
+    setEditQuotaMetric("cost");
+    setEditQuotaPeriod("monthly");
+    setEditQuotaLimit("");
+    setEditAllowedProviders([]);
+    setEditAllowedModels([]);
+  };
+
+  const handleSaveKeySettings = async () => {
+    if (!editingKey) return;
+    try {
+      const res = await fetch(`/api/keys/${editingKey.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quotaMetric: editQuotaMetric,
+          quotaPeriod: editQuotaPeriod,
+          quotaLimit: editQuotaLimit.trim() === "" ? null : Number(editQuotaLimit),
+          allowedProviders: editAllowedProviders,
+          allowedModels: editAllowedModels,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setKeys(prev => prev.map(k => (k.id === editingKey.id ? data.key : k)));
+        closeManageKey();
+      }
+    } catch (error) {
+      console.log("Error updating key settings:", error);
+    }
+  };
+
   const maskKey = (fullKey) => {
     if (!fullKey) return "";
     return fullKey.length > 8 ? fullKey.slice(0, 8) + "..." : fullKey;
@@ -576,11 +661,26 @@ export default function APIPageClient({ machineId }) {
                   <p className="text-xs text-text-muted mt-1">
                     Created {new Date(key.createdAt).toLocaleDateString()}
                   </p>
+                  <p className="text-xs text-text-muted mt-1">
+                    Quota: {key.quotaLimit ? `${key.quotaLimit} ${key.quotaMetric || "cost"} / ${key.quotaPeriod || "monthly"}` : "Unlimited"}
+                  </p>
+                  {(key.allowedProviders?.length > 0 || key.allowedModels?.length > 0) && (
+                    <p className="text-xs text-text-muted mt-1">
+                      Scope: {key.allowedProviders?.length || 0} provider(s), {key.allowedModels?.length || 0} model(s)
+                    </p>
+                  )}
                   {key.isActive === false && (
                     <p className="text-xs text-orange-500 mt-1">Paused</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openManageKey(key)}
+                  >
+                    Manage
+                  </Button>
                   <Toggle
                     size="sm"
                     checked={key.isActive ?? true}
@@ -678,6 +778,92 @@ export default function APIPageClient({ machineId }) {
           <Button onClick={() => setCreatedKey(null)} fullWidth>
             Done
           </Button>
+        </div>
+      </Modal>
+
+      {/* Manage Key Modal */}
+      <Modal
+        isOpen={!!editingKey}
+        title={editingKey ? `Manage ${editingKey.name}` : "Manage API Key"}
+        onClose={closeManageKey}
+      >
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">Quota Metric</label>
+              <select
+                value={editQuotaMetric}
+                onChange={(e) => setEditQuotaMetric(e.target.value)}
+                className="w-full h-10 rounded-lg border border-border bg-bg px-3 text-sm"
+              >
+                <option value="cost">Cost</option>
+                <option value="tokens">Tokens</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Period</label>
+              <select
+                value={editQuotaPeriod}
+                onChange={(e) => setEditQuotaPeriod(e.target.value)}
+                className="w-full h-10 rounded-lg border border-border bg-bg px-3 text-sm"
+              >
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+            <Input
+              label="Limit (empty = unlimited)"
+              type="number"
+              min="0"
+              value={editQuotaLimit}
+              onChange={(e) => setEditQuotaLimit(e.target.value)}
+              placeholder="e.g. 1000"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Allowed Providers</label>
+            <select
+              multiple
+              value={editAllowedProviders}
+              onChange={(e) => setEditAllowedProviders(Array.from(e.target.selectedOptions, (o) => o.value))}
+              className="w-full min-h-28 rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+            >
+              {providerOptions.map((provider) => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-text-muted mt-1">Leave empty to allow all providers.</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Allowed Models</label>
+            <select
+              multiple
+              value={editAllowedModels}
+              onChange={(e) => setEditAllowedModels(Array.from(e.target.selectedOptions, (o) => o.value))}
+              className="w-full min-h-32 rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+            >
+              {modelOptions.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-text-muted mt-1">Leave empty to allow all models.</p>
+          </div>
+
+          <div className="flex gap-2">
+            <Button onClick={handleSaveKeySettings} fullWidth>
+              Save
+            </Button>
+            <Button onClick={closeManageKey} variant="ghost" fullWidth>
+              Cancel
+            </Button>
+          </div>
         </div>
       </Modal>
 

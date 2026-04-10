@@ -6,6 +6,7 @@ import {
   clearAccountError,
   extractApiKey,
   isValidApiKey,
+  validateApiKeyAccess,
 } from "../services/auth.js";
 import { cacheClaudeHeaders } from "open-sse/utils/claudeHeaderCache.js";
 import { getSettings } from "@/lib/localDb";
@@ -137,6 +138,16 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
   }
 
   const { provider, model } = modelInfo;
+  let apiKeyId = null;
+
+  if (apiKey) {
+    const keyAccess = await validateApiKeyAccess(apiKey, { providerId: provider, modelId: model });
+    if (!keyAccess.valid) {
+      log.warn("AUTH", keyAccess.reason);
+      return errorResponse(keyAccess.status || HTTP_STATUS.FORBIDDEN, keyAccess.reason || "API key access denied");
+    }
+    apiKeyId = keyAccess.keyInfo?.id || null;
+  }
 
   // Log model routing (alias → actual model)
   if (modelStr !== `${provider}/${model}`) {
@@ -198,6 +209,7 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       connectionId: credentials.connectionId,
       userAgent,
       apiKey,
+      apiKeyId,
       ccFilterNaming: !!chatSettings.ccFilterNaming,
       // Detect source format by endpoint + body
       sourceFormatOverride: request?.url ? detectFormatByEndpoint(new URL(request.url).pathname, body) : null,

@@ -21,7 +21,7 @@ export async function PUT(request, { params }) {
   try {
     const { id } = await params;
     const body = await request.json();
-    const { isActive } = body;
+    const { isActive, name, quotaMetric, quotaPeriod, quotaLimit, allowedProviders, allowedModels } = body;
 
     const existing = await getApiKeyById(id);
     if (!existing) {
@@ -30,6 +30,31 @@ export async function PUT(request, { params }) {
 
     const updateData = {};
     if (isActive !== undefined) updateData.isActive = isActive;
+    if (typeof name === "string" && name.trim()) updateData.name = name.trim();
+    if (quotaMetric !== undefined) {
+      updateData.quotaMetric = quotaMetric === "tokens" ? "tokens" : "cost";
+    }
+    if (quotaPeriod !== undefined) {
+      updateData.quotaPeriod = ["daily", "weekly", "monthly"].includes(quotaPeriod) ? quotaPeriod : "monthly";
+    }
+    if (quotaLimit !== undefined) {
+      if (quotaLimit === null || quotaLimit === "") {
+        updateData.quotaLimit = null;
+      } else {
+        const numeric = Number(quotaLimit);
+        updateData.quotaLimit = Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+      }
+    }
+    if (allowedProviders !== undefined) {
+      updateData.allowedProviders = Array.isArray(allowedProviders)
+        ? [...new Set(allowedProviders.filter(Boolean))]
+        : [];
+    }
+    if (allowedModels !== undefined) {
+      updateData.allowedModels = Array.isArray(allowedModels)
+        ? [...new Set(allowedModels.filter(Boolean))]
+        : [];
+    }
 
     const updated = await updateApiKey(id, updateData);
 

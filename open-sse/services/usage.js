@@ -533,19 +533,22 @@ async function getCodexUsage(accessToken) {
  * Kiro (AWS CodeWhisperer) Usage
  */
 async function getKiroUsage(accessToken, providerSpecificData) {
-  // Default profileArn fallback
-  const DEFAULT_PROFILE_ARN = "arn:aws:codewhisperer:us-east-1:638616132270:profile/AAAACCCCXXXX";
-  const profileArn = providerSpecificData?.profileArn || DEFAULT_PROFILE_ARN;
+  const region = providerSpecificData?.region || "us-east-1";
+  const profileArn = providerSpecificData?.profileArn || null;
+  const usageApiHost = `https://codewhisperer.${region}.amazonaws.com`;
+  const fallbackApiHost = `https://q.${region}.amazonaws.com`;
 
   try {
     // Try old API first (POST method)
     const payload = {
       origin: "AI_EDITOR",
-      profileArn: profileArn,
       resourceType: "AGENTIC_REQUEST",
     };
+    if (profileArn) {
+      payload.profileArn = profileArn;
+    }
 
-    const response = await fetch("https://codewhisperer.us-east-1.amazonaws.com", {
+    const response = await fetch(usageApiHost, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${accessToken}`,
@@ -616,11 +619,13 @@ async function getKiroUsage(accessToken, providerSpecificData) {
     try {
       const params = new URLSearchParams({
         origin: "AI_EDITOR",
-        profileArn: profileArn,
         resourceType: "AGENTIC_REQUEST",
       });
+      if (profileArn) {
+        params.set("profileArn", profileArn);
+      }
 
-      const fallbackResponse = await fetch(`https://q.us-east-1.amazonaws.com/getUsageLimits?${params}`, {
+      const fallbackResponse = await fetch(`${fallbackApiHost}/getUsageLimits?${params}`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${accessToken}`,
@@ -705,4 +710,3 @@ async function getIflowUsage(accessToken) {
     return { message: "Unable to fetch iFlow usage." };
   }
 }
-

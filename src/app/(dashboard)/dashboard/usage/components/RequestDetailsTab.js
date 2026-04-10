@@ -10,6 +10,7 @@ import { AI_PROVIDERS, getProviderByAlias } from "@/shared/constants/providers";
 
 let providerNameCache = null;
 let providerNodesCache = null;
+const TABLE_COLUMN_COUNT = 8;
 
 async function fetchProviderNames() {
   if (providerNameCache && providerNodesCache) {
@@ -94,9 +95,12 @@ export default function RequestDetailsTab() {
   const [selectedDetail, setSelectedDetail] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [providers, setProviders] = useState([]);
+  const [apiKeys, setApiKeys] = useState([]);
   const [providerNameCache, setProviderNameCache] = useState(null);
   const [filters, setFilters] = useState({
     provider: "",
+    apiKeyScope: "global",
+    apiKeyId: "",
     startDate: "",
     endDate: ""
   });
@@ -104,8 +108,13 @@ export default function RequestDetailsTab() {
   const fetchProviders = useCallback(async () => {
     try {
       const res = await fetch("/api/usage/providers");
+      if (!res.ok) throw new Error("Failed to load providers");
       const data = await res.json();
       setProviders(data.providers || []);
+      const keyRes = await fetch("/api/keys");
+      if (!keyRes.ok) throw new Error("Failed to load API keys");
+      const keyData = await keyRes.json();
+      setApiKeys(keyData.keys || []);
 
       const cache = await fetchProviderNames();
       setProviderNameCache(cache.providerNameCache);
@@ -122,6 +131,8 @@ export default function RequestDetailsTab() {
         pageSize: pagination.pageSize.toString()
       });
       if (filters.provider) params.append("provider", filters.provider);
+      if (filters.apiKeyScope) params.append("apiKeyScope", filters.apiKeyScope);
+      if (filters.apiKeyId) params.append("apiKeyId", filters.apiKeyId);
       if (filters.startDate) params.append("startDate", filters.startDate);
       if (filters.endDate) params.append("endDate", filters.endDate);
 
@@ -159,7 +170,7 @@ export default function RequestDetailsTab() {
   };
 
   const handleClearFilters = () => {
-    setFilters({ provider: "", startDate: "", endDate: "" });
+    setFilters({ provider: "", apiKeyScope: "global", apiKeyId: "", startDate: "", endDate: "" });
   };
 
   return (
@@ -186,6 +197,56 @@ export default function RequestDetailsTab() {
               ))}
             </select>
           </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-text-main">API Key Scope</label>
+            <div className="flex items-center gap-1 bg-bg-subtle rounded-lg p-1 border border-black/10 dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => setFilters((prev) => ({ ...prev, apiKeyScope: "global", apiKeyId: "" }))}
+                className={`px-3 py-1 rounded-md text-sm ${filters.apiKeyScope === "global" ? "bg-primary text-white" : "text-text-muted hover:text-text-main"}`}
+              >
+                Global
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilters((prev) => ({ ...prev, apiKeyScope: "api-key" }))}
+                className={`px-3 py-1 rounded-md text-sm ${filters.apiKeyScope === "api-key" ? "bg-primary text-white" : "text-text-muted hover:text-text-main"}`}
+              >
+                API Key
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilters((prev) => ({ ...prev, apiKeyScope: "no-key", apiKeyId: "" }))}
+                className={`px-3 py-1 rounded-md text-sm ${filters.apiKeyScope === "no-key" ? "bg-primary text-white" : "text-text-muted hover:text-text-main"}`}
+              >
+                No API Key
+              </button>
+            </div>
+          </div>
+
+          {filters.apiKeyScope === "api-key" && (
+            <div className="flex flex-col gap-2">
+              <label htmlFor="api-key-filter" className="text-sm font-medium text-text-main">API Key</label>
+              <select
+                id="api-key-filter"
+                value={filters.apiKeyId}
+                onChange={(e) => setFilters({ ...filters, apiKeyId: e.target.value })}
+                className={cn(
+                  "h-9 px-3 rounded-lg border border-black/10 dark:border-white/10 bg-surface",
+                  "text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20",
+                  "cursor-pointer min-w-[220px]"
+                )}
+              >
+                <option value="">All API Keys</option>
+                {apiKeys.map((key) => (
+                  <option key={key.id} value={key.id}>
+                    {key.name} ({key.id})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           
           <div className="flex flex-col gap-2">
             <label htmlFor="start-date-filter" className="text-sm font-medium text-text-main">Start Date</label>
@@ -217,13 +278,13 @@ export default function RequestDetailsTab() {
           
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium text-text-main opacity-0" aria-hidden="true">Clear</span>
-            <Button 
-              variant="ghost" 
-              onClick={handleClearFilters}
-              disabled={!filters.provider && !filters.startDate && !filters.endDate}
-            >
-              Clear Filters
-            </Button>
+              <Button 
+                variant="ghost" 
+                onClick={handleClearFilters}
+                disabled={!filters.provider && filters.apiKeyScope === "global" && !filters.apiKeyId && !filters.startDate && !filters.endDate}
+              >
+                Clear Filters
+              </Button>
           </div>
         </div>
       </Card>
@@ -236,6 +297,7 @@ export default function RequestDetailsTab() {
                 <th className="text-left p-4 text-sm font-semibold text-text-main">Timestamp</th>
                 <th className="text-left p-4 text-sm font-semibold text-text-main">Model</th>
                 <th className="text-left p-4 text-sm font-semibold text-text-main">Provider</th>
+                <th className="text-left p-4 text-sm font-semibold text-text-main">API Key ID</th>
                 <th className="text-right p-4 text-sm font-semibold text-text-main">Input Tokens</th>
                 <th className="text-right p-4 text-sm font-semibold text-text-main">Output Tokens</th>
                 <th className="text-left p-4 text-sm font-semibold text-text-main">Latency</th>
@@ -245,7 +307,7 @@ export default function RequestDetailsTab() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="p-8 text-center text-text-muted">
+                    <td colSpan={TABLE_COLUMN_COUNT} className="p-8 text-center text-text-muted">
                     <div className="flex items-center justify-center gap-2">
                       <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
                       Loading...
@@ -254,7 +316,7 @@ export default function RequestDetailsTab() {
                 </tr>
               ) : details.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="p-8 text-center text-text-muted">
+                    <td colSpan={TABLE_COLUMN_COUNT} className="p-8 text-center text-text-muted">
                     No request details found
                   </td>
                 </tr>
@@ -270,12 +332,15 @@ export default function RequestDetailsTab() {
                     <td className="p-4 text-sm text-text-main font-mono">
                       {detail.model}
                     </td>
-                    <td className="p-4 text-sm text-text-main">
-                       <span className="font-medium">
-                         {getProviderName(detail.provider, providerNameCache)}
-                       </span>
+                     <td className="p-4 text-sm text-text-main">
+                        <span className="font-medium">
+                          {getProviderName(detail.provider, providerNameCache)}
+                        </span>
+                      </td>
+                     <td className="p-4 text-sm text-text-muted font-mono">
+                       {detail.apiKeyId || "-"}
                      </td>
-                    <td className="p-4 text-sm text-text-main text-right font-mono">
+                     <td className="p-4 text-sm text-text-main text-right font-mono">
                       {detail.tokens?.prompt_tokens?.toLocaleString() || 0}
                     </td>
                     <td className="p-4 text-sm text-text-main text-right font-mono">
@@ -333,7 +398,11 @@ export default function RequestDetailsTab() {
                 <span className="text-text-muted">Timestamp:</span>{" "}
                 <span className="text-text-main">{new Date(selectedDetail.timestamp).toLocaleString()}</span>
               </div>
-              <div>
+               <div>
+                 <span className="text-text-muted">API Key ID:</span>{" "}
+                 <span className="text-text-main font-mono">{selectedDetail.apiKeyId || "-"}</span>
+               </div>
+               <div>
                  <span className="text-text-muted">Provider:</span>{" "}
                  <span className="text-text-main font-medium">{getProviderName(selectedDetail.provider, providerNameCache)}</span>
                </div>
