@@ -19,6 +19,7 @@ const TUNNEL_BENEFITS = [
 ];
 
 const TUNNEL_ACTION_TIMEOUT_MS = 90000;
+const FALLBACK_PROVIDER_META = { icon: "hub", color: "#6B7280" };
 
 // Ensure endpoint URLs consistently resolve to a single /v1 base path.
 function normalizeV1Endpoint(url) {
@@ -221,8 +222,14 @@ export default function APIPageClient({ machineId }) {
         fetch("/api/providers"),
       ]);
       const [modelsData, providersData] = await Promise.all([
-        modelsRes.json().catch(() => ({ data: [] })),
-        providersRes.json().catch(() => ({ connections: [] })),
+        modelsRes.json().catch((error) => {
+          console.warn("Failed to parse /api/v1/models response:", error);
+          return { data: [] };
+        }),
+        providersRes.json().catch((error) => {
+          console.warn("Failed to parse /api/providers response:", error);
+          return { connections: [] };
+        }),
       ]);
       if (modelsRes.ok) {
         const aliasToProviderMeta = {};
@@ -237,27 +244,34 @@ export default function APIPageClient({ machineId }) {
             aliasToProviderMeta[prefix] = {
               id: connection.provider,
               name: connection.name || prefix,
-              icon: base.icon || "hub",
-              color: base.color || "#6B7280",
+              icon: base.icon || FALLBACK_PROVIDER_META.icon,
+              color: base.color || FALLBACK_PROVIDER_META.color,
             };
           }
         });
 
-        const options = (modelsData.data || [])
+        const rawIds = (modelsData.data || [])
           .map((entry) => String(entry?.id || ""))
-          .filter((id) => id.includes("/"))
+          .filter(Boolean);
+        const validIds = rawIds.filter((id) => id.includes("/"));
+        const invalidCount = rawIds.length - validIds.length;
+        if (invalidCount > 0) {
+          console.warn(`Ignored ${invalidCount} model entries without provider prefix from /api/v1/models`);
+        }
+
+        const options = validIds
           .map((id) => {
             const [providerAlias, ...rest] = id.split("/");
             const modelId = rest.join("/");
-            const providerMeta = aliasToProviderMeta[providerAlias] || {};
+            const providerMeta = aliasToProviderMeta[providerAlias] || FALLBACK_PROVIDER_META;
             return {
               id,
               modelId,
               providerAlias,
               providerId: providerMeta.id || providerAlias,
               providerName: providerMeta.name || providerAlias,
-              providerIcon: providerMeta.icon || "hub",
-              providerColor: providerMeta.color || "#6B7280",
+              providerIcon: providerMeta.icon || FALLBACK_PROVIDER_META.icon,
+              providerColor: providerMeta.color || FALLBACK_PROVIDER_META.color,
               name: modelId,
             };
           });
