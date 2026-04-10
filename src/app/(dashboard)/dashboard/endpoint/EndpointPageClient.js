@@ -155,6 +155,7 @@ export default function APIPageClient({ machineId }) {
   const [newKeyName, setNewKeyName] = useState("");
   const [createdKey, setCreatedKey] = useState(null);
   const [modelOptions, setModelOptions] = useState([]);
+  const [configuredProviderOptions, setConfiguredProviderOptions] = useState([]);
   const [editingKey, setEditingKey] = useState(null);
   const [editQuotaMetric, setEditQuotaMetric] = useState("cost");
   const [editQuotaPeriod, setEditQuotaPeriod] = useState("monthly");
@@ -192,19 +193,52 @@ export default function APIPageClient({ machineId }) {
 
   const { copied, copy } = useCopyToClipboard();
 
-  const providerOptions = useMemo(
-    () =>
-      Object.values(AI_PROVIDERS)
-        .filter((p) => !p.hidden)
-        .map((p) => ({
-          id: p.id,
-          name: p.name,
-          icon: p.icon || "hub",
-          color: p.color || "#6B7280",
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [],
-  );
+  const providerLabelMap = useMemo(() => {
+    const labels = {};
+    Object.values(AI_PROVIDERS).forEach((provider) => {
+      labels[provider.id] = provider.name || provider.id;
+    });
+    configuredProviderOptions.forEach((provider) => {
+      labels[provider.id] = provider.name || provider.id;
+    });
+    return labels;
+  }, [configuredProviderOptions]);
+
+  const modelMetaMap = useMemo(() => {
+    const map = new Map();
+    modelOptions.forEach((model) => {
+      map.set(model.id, model);
+    });
+    return map;
+  }, [modelOptions]);
+
+  const getGroupedAllowedModels = useCallback((allowedModels = []) => {
+    const groups = new Map();
+    allowedModels.forEach((modelId) => {
+      const model = modelMetaMap.get(modelId);
+      const providerKey = model?.providerAlias || model?.providerId || modelId.split("/")[0] || "other";
+      const providerLabel = model?.providerName || providerKey;
+      if (!groups.has(providerKey)) {
+        groups.set(providerKey, { providerKey, providerLabel, models: [] });
+      }
+      groups.get(providerKey).models.push(modelId);
+    });
+    return Array.from(groups.values())
+      .map((group) => ({ ...group, models: group.models.sort((a, b) => a.localeCompare(b)) }))
+      .sort((a, b) => a.providerLabel.localeCompare(b.providerLabel));
+  }, [modelMetaMap]);
+
+  const formatQuotaDisplay = useCallback((key) => {
+    const metric = key?.quotaMetric === "tokens" ? "tokens" : "cost";
+    const period = ["daily", "weekly", "monthly"].includes(key?.quotaPeriod) ? key.quotaPeriod : "monthly";
+    const limitValue = key?.quotaLimit;
+    if (limitValue === null || limitValue === undefined || limitValue === "") return "Unlimited";
+    const numericLimit = Number(limitValue);
+    const displayLimit = Number.isFinite(numericLimit) ? numericLimit : limitValue;
+    if (metric === "cost") return `$${displayLimit}/${period}`;
+    const tokenLabel = numericLimit === 1 ? "token" : "tokens";
+    return `${displayLimit} ${tokenLabel}/${period}`;
+  }, []);
 
   const normalizeKeySettings = (key) => ({
     quotaMetric: key?.quotaMetric === "tokens" ? "tokens" : "cost",
@@ -249,6 +283,21 @@ export default function APIPageClient({ machineId }) {
             };
           }
         });
+        const configuredProviders = Array.from(
+          (providersData?.connections || []).reduce((acc, connection) => {
+            if (!connection?.provider) return acc;
+            const base = AI_PROVIDERS[connection.provider] || {};
+            const existing = acc.get(connection.provider) || {};
+            acc.set(connection.provider, {
+              id: connection.provider,
+              name: connection.name || connection?.providerSpecificData?.nodeName || base.name || connection.provider || existing.name,
+              icon: base.icon || FALLBACK_PROVIDER_META.icon,
+              color: base.color || FALLBACK_PROVIDER_META.color,
+            });
+            return acc;
+          }, new Map()).values(),
+        ).sort((a, b) => a.name.localeCompare(b.name));
+        setConfiguredProviderOptions(configuredProviders);
 
         const rawIds = (modelsData.data || [])
           .map((entry) => String(entry?.id || ""))
@@ -650,8 +699,8 @@ export default function APIPageClient({ machineId }) {
   }, []);
 
   const availableProviderOptions = useMemo(
-    () => providerOptions.filter((provider) => !editAllowedProviders.includes(provider.id)),
-    [providerOptions, editAllowedProviders],
+    () => configuredProviderOptions.filter((provider) => !editAllowedProviders.includes(provider.id)),
+    [configuredProviderOptions, editAllowedProviders],
   );
 
   const modelGroups = useMemo(() => {
@@ -671,8 +720,8 @@ export default function APIPageClient({ machineId }) {
         }
         groups.get(groupKey).options.push({
           value: model.id,
-          label: model.name,
-          description: model.providerAlias,
+          label: model.id,
+          description: model.providerName,
         });
       });
 
@@ -900,12 +949,43 @@ export default function APIPageClient({ machineId }) {
                     Created {new Date(key.createdAt).toLocaleDateString()}
                   </p>
                   <p className="text-xs text-text-muted mt-1">
-                    Quota: {key.quotaLimit ? `${key.quotaLimit} ${key.quotaMetric || "cost"} / ${key.quotaPeriod || "monthly"}` : "Unlimited"}
+                    Quota: {formatQuotaDisplay(key)}
                   </p>
                   {(key.allowedProviders?.length > 0 || key.allowedModels?.length > 0) && (
-                    <p className="text-xs text-text-muted mt-1">
-                      Scope: {key.allowedProviders?.length || 0} provider(s), {key.allowedModels?.length || 0} model(s)
-                    </p>
+                    <div className="mt-2 flex flex-col gap-2">
+                      {key.allowedProviders?.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {key.allowedProviders.map((providerId) => (
+                            <span key={providerId} className="inline-flex items-center px-2 py-1 rounded-md bg-bg-subtle text-xs border border-border">
+                              {providerLabelMap[providerId] || providerId}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {key.allowedModels?.length > 0 && (
+                        <details className="rounded-md border border-border bg-bg-subtle/40 px-2 py-1.5">
+                          <summary className="cursor-pointer text-xs font-medium text-text-muted">
+                            Allowed models ({key.allowedModels.length})
+                          </summary>
+                          <div className="mt-2 space-y-2">
+                            {getGroupedAllowedModels(key.allowedModels).map((group) => (
+                              <details key={group.providerKey} open className="pl-2 border-l border-border/60">
+                                <summary className="cursor-pointer text-xs text-text-muted">
+                                  {group.providerLabel} ({group.models.length})
+                                </summary>
+                                <div className="mt-1 flex flex-wrap gap-2">
+                                  {group.models.map((modelId) => (
+                                    <span key={modelId} className="inline-flex items-center px-2 py-1 rounded-md bg-bg-subtle text-xs border border-border">
+                                      {modelId}
+                                    </span>
+                                  ))}
+                                </div>
+                              </details>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                    </div>
                   )}
                   {key.isActive === false && (
                     <p className="text-xs text-orange-500 mt-1">Paused</p>
@@ -1086,15 +1166,15 @@ export default function APIPageClient({ machineId }) {
                 <span className="text-xs text-text-muted">All providers allowed.</span>
               ) : (
                 editAllowedProviders.map((providerId) => {
-                  const provider = providerOptions.find((p) => p.id === providerId);
+                  const provider = configuredProviderOptions.find((p) => p.id === providerId);
                   return (
                     <span key={providerId} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-bg-subtle text-xs border border-border">
-                      {provider?.name || providerId}
+                      {provider?.name || providerLabelMap[providerId] || providerId}
                       <button
                         type="button"
                         onClick={() => removeAllowedProvider(providerId)}
                         className="material-symbols-outlined text-[14px] text-text-muted hover:text-text-main"
-                        aria-label={`Remove ${provider?.name || providerId}`}
+                        aria-label={`Remove ${provider?.name || providerLabelMap[providerId] || providerId}`}
                       >
                         close
                       </button>
@@ -1115,26 +1195,32 @@ export default function APIPageClient({ machineId }) {
               groups={modelGroups}
               onSelect={addAllowedModel}
             />
-            <div className="flex flex-wrap gap-2 mt-2 min-h-6">
+            <div className="mt-2 min-h-6 space-y-2">
               {editAllowedModels.length === 0 ? (
                 <span className="text-xs text-text-muted">All models allowed.</span>
               ) : (
-                editAllowedModels.map((modelId) => {
-                  const model = modelOptions.find((m) => m.id === modelId);
-                  return (
-                    <span key={modelId} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-bg-subtle text-xs border border-border">
-                      {model?.name || modelId}
-                      <button
-                        type="button"
-                        onClick={() => removeAllowedModel(modelId)}
-                        className="material-symbols-outlined text-[14px] text-text-muted hover:text-text-main"
-                        aria-label={`Remove ${model?.name || modelId}`}
-                      >
-                        close
-                      </button>
-                    </span>
-                  );
-                })
+                getGroupedAllowedModels(editAllowedModels).map((group) => (
+                  <details key={group.providerKey} open className="rounded-md border border-border bg-bg-subtle/40 px-2 py-1.5">
+                    <summary className="cursor-pointer text-xs font-medium text-text-muted">
+                      {group.providerLabel} ({group.models.length})
+                    </summary>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {group.models.map((modelId) => (
+                        <span key={modelId} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-bg-subtle text-xs border border-border">
+                          {modelId}
+                          <button
+                            type="button"
+                            onClick={() => removeAllowedModel(modelId)}
+                            className="material-symbols-outlined text-[14px] text-text-muted hover:text-text-main"
+                            aria-label={`Remove ${modelId}`}
+                          >
+                            close
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </details>
+                ))
               )}
             </div>
             <p className="text-xs text-text-muted mt-1">Leave empty to allow all models.</p>
