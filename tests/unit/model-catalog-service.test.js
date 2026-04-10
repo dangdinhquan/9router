@@ -131,8 +131,8 @@ describe("modelCatalogService", () => {
     );
 
     await Promise.resolve();
-    const afterFailure = await service.getModelCatalog();
-    expect(afterFailure.providers.openai.find((m) => m.id === "gpt-5.4")?.contextWindow).toBe(123000);
+    const staleCacheAfterError = await service.getModelCatalog();
+    expect(staleCacheAfterError.providers.openai.find((m) => m.id === "gpt-5.4")?.contextWindow).toBe(123000);
 
     nowSpy.mockRestore();
   });
