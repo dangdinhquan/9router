@@ -215,6 +215,13 @@ export default function RequestDetailsTab() {
               >
                 API Key
               </button>
+              <button
+                type="button"
+                onClick={() => setFilters((prev) => ({ ...prev, apiKeyScope: "no-key", apiKeyId: "" }))}
+                className={`px-3 py-1 rounded-md text-sm ${filters.apiKeyScope === "no-key" ? "bg-primary text-white" : "text-text-muted hover:text-text-main"}`}
+              >
+                No API Key
+              </button>
             </div>
           </div>
 

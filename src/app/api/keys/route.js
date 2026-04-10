@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getApiKeys, createApiKey, updateApiKey } from "@/lib/localDb";
+import { getApiKeys, createApiKey } from "@/lib/localDb";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 
 export const dynamic = "force-dynamic";
@@ -42,11 +42,8 @@ export async function POST(request) {
 
     // Always get machineId from server
     const machineId = await getConsistentMachineId();
-    const apiKey = await createApiKey(name, machineId);
-
     const nextPolicy = normalizeKeySettings({ quotaMetric, quotaPeriod, quotaLimit, allowedProviders, allowedModels });
-
-    const updatedKey = await updateApiKey(apiKey.id, nextPolicy);
+    const updatedKey = await createApiKey(name, machineId, nextPolicy);
 
     return NextResponse.json({
       key: updatedKey.key,

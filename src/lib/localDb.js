@@ -906,7 +906,7 @@ function generateShortKey() {
  * @param {string} name - Key name
  * @param {string} machineId - MachineId (required)
  */
-export async function createApiKey(name, machineId) {
+export async function createApiKey(name, machineId, policy = {}) {
   if (!machineId) {
     throw new Error("machineId is required");
   }
@@ -925,6 +925,7 @@ export async function createApiKey(name, machineId) {
     machineId: machineId,
     isActive: true,
     ...getDefaultApiKeyPolicy(),
+    ...(policy || {}),
     createdAt: now,
   };
 
