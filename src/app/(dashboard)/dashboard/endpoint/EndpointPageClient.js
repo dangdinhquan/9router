@@ -236,7 +236,7 @@ export default function APIPageClient({ machineId }) {
     const numericLimit = Number(limitValue);
     const displayLimit = Number.isFinite(numericLimit) ? numericLimit : limitValue;
     if (metric === "cost") return `$${displayLimit}/${period}`;
-    const tokenLabel = numericLimit === 1 ? "token" : "tokens";
+    const tokenLabel = Number.isFinite(numericLimit) && numericLimit === 1 ? "token" : "tokens";
     return `${displayLimit} ${tokenLabel}/${period}`;
   }, []);
 
@@ -287,10 +287,13 @@ export default function APIPageClient({ machineId }) {
           (providersData?.connections || []).reduce((acc, connection) => {
             if (!connection?.provider) return acc;
             const base = AI_PROVIDERS[connection.provider] || {};
-            const existing = acc.get(connection.provider) || {};
+            const resolvedName = connection.name
+              || connection?.providerSpecificData?.nodeName
+              || base.name
+              || connection.provider;
             acc.set(connection.provider, {
               id: connection.provider,
-              name: connection.name || connection?.providerSpecificData?.nodeName || base.name || connection.provider || existing.name,
+              name: resolvedName,
               icon: base.icon || FALLBACK_PROVIDER_META.icon,
               color: base.color || FALLBACK_PROVIDER_META.color,
             });
