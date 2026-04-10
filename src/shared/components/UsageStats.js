@@ -408,9 +408,9 @@ export default function UsageStats() {
   const providerUsage = useMemo(() => {
     const usage = {};
     Object.values(stats?.byModel || {}).forEach((item) => {
-      const providerId = item?.provider?.toLowerCase();
-      if (!providerId) return;
-      usage[providerId] = (usage[providerId] || 0) + (Number(item.requests) || 0);
+      const providerKey = item?.provider?.toLowerCase();
+      if (!providerKey) return;
+      usage[providerKey] = (usage[providerKey] || 0) + (Number(item.requests) || 0);
     });
     return usage;
   }, [stats?.byModel]);
