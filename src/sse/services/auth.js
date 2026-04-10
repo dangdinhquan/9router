@@ -275,7 +275,8 @@ export async function isValidApiKey(apiKey) {
 }
 
 function normalizeModelRule(modelRule) {
-  if (!modelRule || typeof modelRule !== "string" || !modelRule.includes("/")) return modelRule;
+  if (!modelRule || typeof modelRule !== "string") return modelRule;
+  if (!modelRule.includes("/")) return modelRule;
   const [rawProvider, ...rest] = modelRule.split("/");
   if (!rawProvider || rest.length === 0) return modelRule;
   return `${resolveProviderId(rawProvider)}/${rest.join("/")}`;

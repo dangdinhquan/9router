@@ -10,6 +10,7 @@ import { AI_PROVIDERS, getProviderByAlias } from "@/shared/constants/providers";
 
 let providerNameCache = null;
 let providerNodesCache = null;
+const TABLE_COLUMN_COUNT = 8;
 
 async function fetchProviderNames() {
   if (providerNameCache && providerNodesCache) {
@@ -299,7 +300,7 @@ export default function RequestDetailsTab() {
             <tbody>
               {loading ? (
                 <tr>
-                    <td colSpan="8" className="p-8 text-center text-text-muted">
+                    <td colSpan={TABLE_COLUMN_COUNT} className="p-8 text-center text-text-muted">
                     <div className="flex items-center justify-center gap-2">
                       <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
                       Loading...
@@ -308,7 +309,7 @@ export default function RequestDetailsTab() {
                 </tr>
               ) : details.length === 0 ? (
                 <tr>
-                    <td colSpan="8" className="p-8 text-center text-text-muted">
+                    <td colSpan={TABLE_COLUMN_COUNT} className="p-8 text-center text-text-muted">
                     No request details found
                   </td>
                 </tr>

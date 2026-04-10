@@ -664,8 +664,9 @@ const PROVIDERS = {
         scopes: config.scopes,
         grantTypes: config.grantTypes,
       };
-      if (!isEnterprise && config.issuerUrl) {
-        registerPayload.issuerUrl = config.issuerUrl;
+      const issuerUrl = options?.issuerUrl || config.issuerUrl;
+      if (issuerUrl) {
+        registerPayload.issuerUrl = issuerUrl;
       }
 
       // Step 1: Register client with AWS SSO OIDC
