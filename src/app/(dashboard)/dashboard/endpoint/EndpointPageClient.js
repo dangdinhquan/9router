@@ -20,6 +20,7 @@ const TUNNEL_BENEFITS = [
 
 const TUNNEL_ACTION_TIMEOUT_MS = 90000;
 
+// Ensure endpoint URLs consistently resolve to a single /v1 base path.
 function normalizeV1Endpoint(url) {
   const trimmed = (url || "").trim();
   if (!trimmed) return "/v1";
@@ -128,6 +129,24 @@ function SearchableOptionDropdown({
   );
 }
 
+SearchableOptionDropdown.propTypes = {
+  triggerText: PropTypes.string.isRequired,
+  searchPlaceholder: PropTypes.string.isRequired,
+  emptyText: PropTypes.string.isRequired,
+  groups: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    label: PropTypes.string.isRequired,
+    icon: PropTypes.string,
+    color: PropTypes.string,
+    options: PropTypes.arrayOf(PropTypes.shape({
+      value: PropTypes.string.isRequired,
+      label: PropTypes.string.isRequired,
+      description: PropTypes.string,
+    })).isRequired,
+  })).isRequired,
+  onSelect: PropTypes.func.isRequired,
+};
+
 export default function APIPageClient({ machineId }) {
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -196,6 +215,7 @@ export default function APIPageClient({ machineId }) {
 
   const fetchModelOptions = async () => {
     try {
+      // Use OpenAI-compatible models endpoint so options match the real API endpoint model list.
       const [modelsRes, providersRes] = await Promise.all([
         fetch("/api/v1/models"),
         fetch("/api/providers"),
