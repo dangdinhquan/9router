@@ -270,13 +270,13 @@ export default function ProfilePage() {
 
   const updateModelCatalogTtl = async (value) => {
     const parsed = Number.parseInt(value, 10);
-    if (Number.isNaN(parsed)) return;
+    const normalizedValue = Number.isNaN(parsed) ? 720 : parsed;
 
     try {
       const res = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ MODEL_CATALOG_TTL_MINUTES: parsed }),
+        body: JSON.stringify({ MODEL_CATALOG_TTL_MINUTES: normalizedValue }),
       });
       if (res.ok) {
         const data = await res.json();

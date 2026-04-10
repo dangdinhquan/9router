@@ -200,8 +200,9 @@ export default function ModelsCard({ providerId, kindFilter }) {
 
   // Get models — filter by kindFilter if provided
   const staticModels = getModelsByProviderId(providerId);
-  const allModels = Array.isArray(catalogProviders?.[providerId]) && catalogProviders[providerId].length > 0
-    ? catalogProviders[providerId]
+  const providerCatalogModels = catalogProviders?.[providerId];
+  const allModels = Array.isArray(providerCatalogModels) && providerCatalogModels.length > 0
+    ? providerCatalogModels
     : staticModels;
   const displayModels = kindFilter
     ? allModels.filter((m) => {
