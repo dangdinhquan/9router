@@ -253,6 +253,43 @@ export default function ProfilePage() {
     }
   };
 
+  const updateDynamicModelCatalogEnabled = async (enabled) => {
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ENABLE_DYNAMIC_MODEL_CATALOG: enabled }),
+      });
+      if (res.ok) {
+        setSettings((prev) => ({ ...prev, ENABLE_DYNAMIC_MODEL_CATALOG: enabled }));
+      }
+    } catch (err) {
+      console.error("Failed to update dynamic catalog setting:", err);
+    }
+  };
+
+  const updateModelCatalogTtl = async (value) => {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isNaN(parsed)) return;
+
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ MODEL_CATALOG_TTL_MINUTES: parsed }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSettings((prev) => ({
+          ...prev,
+          MODEL_CATALOG_TTL_MINUTES: data.MODEL_CATALOG_TTL_MINUTES ?? prev.MODEL_CATALOG_TTL_MINUTES,
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to update model catalog TTL:", err);
+    }
+  };
+
   const reloadSettings = async () => {
     try {
       const res = await fetch("/api/settings");
@@ -647,6 +684,55 @@ export default function ProfilePage() {
               onChange={updateObservabilityEnabled}
               disabled={loading}
             />
+          </div>
+        </Card>
+
+        {/* Model Catalog Settings */}
+        <Card>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-500">
+              <span className="material-symbols-outlined text-[20px]">database</span>
+            </div>
+            <h3 className="text-lg font-semibold">Model Catalog</h3>
+          </div>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Enable Dynamic Catalog</p>
+                <p className="text-sm text-text-muted">
+                  Merge static models with live metadata from models.dev.
+                </p>
+              </div>
+              <Toggle
+                checked={settings.ENABLE_DYNAMIC_MODEL_CATALOG !== false}
+                onChange={updateDynamicModelCatalogEnabled}
+                disabled={loading}
+              />
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-border/50">
+              <div>
+                <p className="font-medium">Catalog TTL (minutes)</p>
+                <p className="text-sm text-text-muted">
+                  Refresh cache every 5 to 10080 minutes (default 720).
+                </p>
+              </div>
+              <Input
+                type="number"
+                min="5"
+                max="10080"
+                value={settings.MODEL_CATALOG_TTL_MINUTES ?? 720}
+                onChange={(e) => {
+                  const nextValue = e.target.value;
+                  setSettings((prev) => ({
+                    ...prev,
+                    MODEL_CATALOG_TTL_MINUTES: nextValue === "" ? "" : Number(nextValue),
+                  }));
+                }}
+                onBlur={(e) => updateModelCatalogTtl(e.target.value)}
+                disabled={loading}
+                className="w-28 text-center"
+              />
+            </div>
           </div>
         </Card>
 
