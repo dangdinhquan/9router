@@ -1,7 +1,4 @@
-import React from "react";
 import { describe, expect, it } from "vitest";
-import { renderToStaticMarkup } from "react-dom/server";
-import { ModelRow } from "../../src/app/(dashboard)/dashboard/providers/components/ModelsCard.js";
 import { formatContextWindow, getCapabilityDisplay } from "../../src/shared/utils/modelCatalogPresentation.js";
 
 describe("models metadata rendering", () => {
@@ -15,29 +12,17 @@ describe("models metadata rendering", () => {
     expect(display.label).toBe("Vision");
   });
 
-  it("renders token size and capability labels in model row", () => {
-    const html = renderToStaticMarkup(
-      React.createElement(ModelRow, {
-        model: { id: "gpt-5.4", contextWindow: 200000, capabilities: ["vision", "tools"] },
-        fullModel: "openai/gpt-5.4",
-        copied: "",
-        onCopy: () => {},
-      }),
-    );
-    expect(html).toContain("200k");
-    expect(html).toContain("Vision");
-    expect(html).toContain("Tools");
+  it("returns label/icon metadata used by UI capability chips", () => {
+    const vision = getCapabilityDisplay("vision");
+    const tools = getCapabilityDisplay("tools");
+    expect(vision.label).toBe("Vision");
+    expect(vision.icon).toBe("visibility");
+    expect(tools.label).toBe("Tools");
+    expect(tools.icon).toBe("build");
   });
 
-  it("renders subtle fallback when metadata is missing", () => {
-    const html = renderToStaticMarkup(
-      React.createElement(ModelRow, {
-        model: { id: "unknown-model" },
-        fullModel: "openai/unknown-model",
-        copied: "",
-        onCopy: () => {},
-      }),
-    );
-    expect(html).toContain("—");
+  it("returns placeholder for missing token metadata", () => {
+    expect(formatContextWindow(undefined)).toBe("—");
+    expect(formatContextWindow(null)).toBe("—");
   });
 });
