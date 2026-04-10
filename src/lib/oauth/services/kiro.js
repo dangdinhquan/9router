@@ -256,8 +256,8 @@ export class KiroService {
   /**
    * List available models from CodeWhisperer API
    */
-  async listAvailableModels(accessToken, profileArn) {
-    const endpoint = "https://codewhisperer.us-east-1.amazonaws.com";
+  async listAvailableModels(accessToken, profileArn, region = "us-east-1") {
+    const endpoint = `https://codewhisperer.${region}.amazonaws.com`;
     const target = "AmazonCodeWhispererService.ListAvailableModels";
 
     const response = await fetch(endpoint, {
@@ -270,7 +270,7 @@ export class KiroService {
       },
       body: JSON.stringify({
         origin: "AI_EDITOR",
-        profileArn,
+        ...(profileArn ? { profileArn } : {}),
       }),
     });
 

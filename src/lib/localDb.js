@@ -110,6 +110,16 @@ function cloneDefaultData() {
   };
 }
 
+function getDefaultApiKeyPolicy() {
+  return {
+    quotaMetric: "cost",
+    quotaPeriod: "monthly",
+    quotaLimit: null,
+    allowedProviders: [],
+    allowedModels: [],
+  };
+}
+
 function ensureDbShape(data) {
   const defaults = cloneDefaultData();
   const next = data && typeof data === "object" ? data : {};
@@ -160,6 +170,13 @@ function ensureDbShape(data) {
         if (apiKey.isActive === undefined || apiKey.isActive === null) {
           apiKey.isActive = true;
           changed = true;
+        }
+        const policyDefaults = getDefaultApiKeyPolicy();
+        for (const [policyKey, policyValue] of Object.entries(policyDefaults)) {
+          if (apiKey[policyKey] === undefined) {
+            apiKey[policyKey] = Array.isArray(policyValue) ? [...policyValue] : policyValue;
+            changed = true;
+          }
         }
       }
     }
@@ -907,6 +924,7 @@ export async function createApiKey(name, machineId) {
     key: result.key,
     machineId: machineId,
     isActive: true,
+    ...getDefaultApiKeyPolicy(),
     createdAt: now,
   };
 
@@ -961,6 +979,14 @@ export async function validateApiKey(key) {
   const db = await getDb();
   const found = db.data.apiKeys.find(k => k.key === key);
   return found && found.isActive !== false;
+}
+
+/**
+ * Get API key object by key value
+ */
+export async function getApiKeyByKey(key) {
+  const db = await getDb();
+  return db.data.apiKeys.find(k => k.key === key) || null;
 }
 
 // ============ Data Cleanup ============

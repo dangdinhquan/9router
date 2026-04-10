@@ -262,12 +262,13 @@ export async function GET(request, { params }) {
       try {
         const kiroService = new KiroService();
         const profileArn = connection.providerSpecificData?.profileArn;
+        const region = connection.providerSpecificData?.region || "us-east-1";
         const accessToken = connection.accessToken;
         const refreshToken = connection.refreshToken;
 
-        if (accessToken && profileArn) {
+        if (accessToken) {
           try {
-            const models = await kiroService.listAvailableModels(accessToken, profileArn);
+            const models = await kiroService.listAvailableModels(accessToken, profileArn, region);
             return NextResponse.json({
               provider: connection.provider,
               connectionId: connection.id,
@@ -285,7 +286,7 @@ export async function GET(request, { params }) {
                   expiresIn: refreshed.expiresIn,
                 });
 
-                const models = await kiroService.listAvailableModels(refreshed.accessToken, profileArn);
+                const models = await kiroService.listAvailableModels(refreshed.accessToken, profileArn, region);
                 return NextResponse.json({
                   provider: connection.provider,
                   connectionId: connection.id,

@@ -42,7 +42,13 @@ export async function GET(request, { params }) {
       const noPkceDeviceProviders = ["github", "kiro", "kimi-coding", "kilocode", "codebuddy"];
       let deviceData;
       if (noPkceDeviceProviders.includes(provider)) {
-        deviceData = await requestDeviceCode(provider);
+        if (provider === "kiro") {
+          const startUrl = searchParams.get("startUrl") || undefined;
+          const region = searchParams.get("region") || undefined;
+          deviceData = await requestDeviceCode(provider, null, { startUrl, region });
+        } else {
+          deviceData = await requestDeviceCode(provider);
+        }
       } else {
         // Qwen and other PKCE providers
         deviceData = await requestDeviceCode(provider, authData.codeChallenge);

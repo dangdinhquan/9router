@@ -5,7 +5,7 @@ import {
   markAccountUnavailable,
   clearAccountError,
   extractApiKey,
-  isValidApiKey,
+  validateApiKeyAccess,
 } from "../services/auth.js";
 import { cacheClaudeHeaders } from "open-sse/utils/claudeHeaderCache.js";
 import { getSettings } from "@/lib/localDb";
@@ -71,11 +71,6 @@ export async function handleChat(request, clientRawRequest = null) {
       log.warn("AUTH", "Missing API key (requireApiKey=true)");
       return errorResponse(HTTP_STATUS.UNAUTHORIZED, "Missing API key");
     }
-    const valid = await isValidApiKey(apiKey);
-    if (!valid) {
-      log.warn("AUTH", "Invalid API key (requireApiKey=true)");
-      return errorResponse(HTTP_STATUS.UNAUTHORIZED, "Invalid API key");
-    }
   }
 
   if (!modelStr) {
@@ -137,6 +132,16 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
   }
 
   const { provider, model } = modelInfo;
+  let apiKeyId = null;
+
+  if (apiKey) {
+    const keyAccess = await validateApiKeyAccess(apiKey, { providerId: provider, modelId: model });
+    if (!keyAccess.valid) {
+      log.warn("AUTH", keyAccess.reason);
+      return errorResponse(keyAccess.status || HTTP_STATUS.FORBIDDEN, keyAccess.reason || "API key access denied");
+    }
+    apiKeyId = keyAccess.keyInfo?.id || null;
+  }
 
   // Log model routing (alias → actual model)
   if (modelStr !== `${provider}/${model}`) {
@@ -198,6 +203,7 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       connectionId: credentials.connectionId,
       userAgent,
       apiKey,
+      apiKeyId,
       ccFilterNaming: !!chatSettings.ccFilterNaming,
       // Detect source format by endpoint + body
       sourceFormatOverride: request?.url ? detectFormatByEndpoint(new URL(request.url).pathname, body) : null,

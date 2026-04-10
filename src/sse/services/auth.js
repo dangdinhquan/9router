@@ -1,4 +1,5 @@
-import { getProviderConnections, validateApiKey, updateProviderConnection, getSettings } from "@/lib/localDb";
+import { getProviderConnections, validateApiKey, updateProviderConnection, getSettings, getApiKeyByKey } from "@/lib/localDb";
+import { getApiKeyPeriodUsage } from "@/lib/usageDb";
 import { resolveConnectionProxyConfig } from "@/lib/network/connectionProxy";
 import { formatRetryAfter, checkFallbackError, isModelLockActive, buildModelLockUpdate, getEarliestModelLockUntil } from "open-sse/services/accountFallback.js";
 import { resolveProviderId, FREE_PROVIDERS } from "@/shared/constants/providers.js";
@@ -271,4 +272,50 @@ export function extractApiKey(request) {
 export async function isValidApiKey(apiKey) {
   if (!apiKey) return false;
   return await validateApiKey(apiKey);
+}
+
+function normalizeModelRule(modelRule) {
+  if (!modelRule || typeof modelRule !== "string" || !modelRule.includes("/")) return modelRule;
+  const [rawProvider, ...rest] = modelRule.split("/");
+  if (!rawProvider || rest.length === 0) return modelRule;
+  return `${resolveProviderId(rawProvider)}/${rest.join("/")}`;
+}
+
+/**
+ * Validate API key policy against provider/model and quota
+ */
+export async function validateApiKeyAccess(apiKey, { providerId, modelId }) {
+  if (!apiKey) return { valid: false, status: 401, reason: "Missing API key" };
+  const keyInfo = await getApiKeyByKey(apiKey);
+  if (!keyInfo || keyInfo.isActive === false) {
+    return { valid: false, status: 401, reason: "Invalid API key" };
+  }
+
+  const normalizedProvider = resolveProviderId(providerId);
+  const allowedProviders = Array.isArray(keyInfo.allowedProviders) ? keyInfo.allowedProviders : [];
+  if (allowedProviders.length > 0 && !allowedProviders.includes(normalizedProvider)) {
+    return { valid: false, status: 403, reason: `API key is not allowed for provider ${normalizedProvider}` };
+  }
+
+  const allowedModels = Array.isArray(keyInfo.allowedModels) ? keyInfo.allowedModels : [];
+  if (allowedModels.length > 0) {
+    const target = `${normalizedProvider}/${modelId}`;
+    const normalizedAllowedModels = allowedModels.map(normalizeModelRule);
+    if (!normalizedAllowedModels.includes(target)) {
+      return { valid: false, status: 403, reason: `API key is not allowed for model ${target}` };
+    }
+  }
+
+  const metric = keyInfo.quotaMetric === "tokens" ? "tokens" : "cost";
+  const quotaPeriod = ["daily", "weekly", "monthly"].includes(keyInfo.quotaPeriod) ? keyInfo.quotaPeriod : "monthly";
+  const quotaLimit = Number(keyInfo.quotaLimit);
+  if (Number.isFinite(quotaLimit) && quotaLimit > 0) {
+    const used = await getApiKeyPeriodUsage(apiKey, metric, quotaPeriod);
+    if (used >= quotaLimit) {
+      const unit = metric === "tokens" ? "tokens" : "cost";
+      return { valid: false, status: 429, reason: `API key ${quotaPeriod} ${unit} quota exceeded` };
+    }
+  }
+
+  return { valid: true, keyInfo };
 }
