@@ -194,17 +194,21 @@ export default function UsageStats() {
   const [tableView, setTableView] = useState("model");
   const [viewMode, setViewMode] = useState("costs");
   const [providers, setProviders] = useState([]);
+  const [apiKeys, setApiKeys] = useState([]);
   const [period, setPeriod] = useState("7d");
   const [apiKeyScope, setApiKeyScope] = useState("global");
+  const [selectedApiKeyId, setSelectedApiKeyId] = useState("");
 
   // Fetch connected providers once, deduplicate by provider type
   // Always include noAuth free providers (e.g. opencode) regardless of connections
   useEffect(() => {
-    fetch("/api/providers")
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => {
+    Promise.all([
+      fetch("/api/providers").then((r) => r.ok ? r.json() : null),
+      fetch("/api/keys").then((r) => r.ok ? r.json() : null),
+    ])
+      .then(([providerData, keyData]) => {
         const seen = new Set();
-        const unique = (d?.connections || []).filter((c) => {
+        const unique = (providerData?.connections || []).filter((c) => {
           if (seen.has(c.provider)) return false;
           seen.add(c.provider);
           return true;
@@ -213,6 +217,7 @@ export default function UsageStats() {
           .filter((p) => p.noAuth && !seen.has(p.id))
           .map((p) => ({ provider: p.id, name: p.name }));
         setProviders([...unique, ...noAuthProviders]);
+        setApiKeys(keyData?.keys || []);
       })
       .catch(() => {});
   }, []);
@@ -223,7 +228,12 @@ export default function UsageStats() {
     if (!stats) setLoading(true);
     else setFetching(true);
 
-    fetch(`/api/usage/stats?period=${period}&apiKeyScope=${apiKeyScope}`)
+    const params = new URLSearchParams({ period, apiKeyScope });
+    if (apiKeyScope === "api-key" && selectedApiKeyId) {
+      params.set("apiKeyId", selectedApiKeyId);
+    }
+
+    fetch(`/api/usage/stats?${params.toString()}`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data) setStats((prev) => ({ ...prev, ...data }));
@@ -233,7 +243,7 @@ export default function UsageStats() {
         setLoading(false);
         setFetching(false);
       });
-  }, [period, apiKeyScope]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [period, apiKeyScope, selectedApiKeyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // SSE connection - real-time updates for activeRequests + recentRequests only
   useEffect(() => {
@@ -403,7 +413,10 @@ export default function UsageStats() {
       <div className="flex items-center gap-2 self-end flex-wrap justify-end">
         <div className="flex items-center gap-1 bg-bg-subtle rounded-lg p-1 border border-border">
           <button
-            onClick={() => setApiKeyScope("global")}
+            onClick={() => {
+              setApiKeyScope("global");
+              setSelectedApiKeyId("");
+            }}
             className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${apiKeyScope === "global" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:text-text hover:bg-bg-hover"}`}
           >
             Global
@@ -415,12 +428,29 @@ export default function UsageStats() {
             API Key
           </button>
           <button
-            onClick={() => setApiKeyScope("no-key")}
+            onClick={() => {
+              setApiKeyScope("no-key");
+              setSelectedApiKeyId("");
+            }}
             className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${apiKeyScope === "no-key" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:text-text hover:bg-bg-hover"}`}
           >
             No API Key
           </button>
         </div>
+        {apiKeyScope === "api-key" && (
+          <select
+            value={selectedApiKeyId}
+            onChange={(e) => setSelectedApiKeyId(e.target.value)}
+            className="px-3 py-1.5 rounded-lg border border-border bg-bg-subtle text-sm font-medium text-text focus:outline-none focus:ring-2 focus:ring-primary/50 min-w-[220px]"
+          >
+            <option value="">All API Keys</option>
+            {apiKeys.map((key) => (
+              <option key={key.id} value={key.id}>
+                {key.name}
+              </option>
+            ))}
+          </select>
+        )}
         <div className="flex items-center gap-1 bg-bg-subtle rounded-lg p-1 border border-border">
           {PERIODS.map((p) => (
             <button

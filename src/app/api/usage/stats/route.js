@@ -11,6 +11,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "7d";
     const apiKeyScope = searchParams.get("apiKeyScope") || "global";
+    const apiKeyId = searchParams.get("apiKeyId") || "";
 
     if (!VALID_PERIODS.has(period)) {
       return NextResponse.json({ error: "Invalid period" }, { status: 400 });
@@ -20,7 +21,7 @@ export async function GET(request) {
       return NextResponse.json({ error: "Invalid apiKeyScope" }, { status: 400 });
     }
 
-    const stats = await getUsageStats(period, { apiKeyScope });
+    const stats = await getUsageStats(period, { apiKeyScope, apiKeyId });
     return NextResponse.json(stats);
   } catch (error) {
     console.error("[API] Failed to get usage stats:", error);

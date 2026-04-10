@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Card from "@/shared/components/Card";
 import Button from "@/shared/components/Button";
 import Drawer from "@/shared/components/Drawer";
@@ -105,6 +105,14 @@ export default function RequestDetailsTab() {
     endDate: ""
   });
 
+  const apiKeyNameMap = useMemo(() => {
+    const map = {};
+    for (const key of apiKeys) {
+      map[key.id] = key.name;
+    }
+    return map;
+  }, [apiKeys]);
+
   const fetchProviders = useCallback(async () => {
     try {
       const res = await fetch("/api/usage/providers");
@@ -172,6 +180,11 @@ export default function RequestDetailsTab() {
   const handleClearFilters = () => {
     setFilters({ provider: "", apiKeyScope: "global", apiKeyId: "", startDate: "", endDate: "" });
   };
+
+  const getApiKeyDisplayName = useCallback((apiKeyId) => {
+    if (!apiKeyId) return "-";
+    return apiKeyNameMap[apiKeyId] || apiKeyId;
+  }, [apiKeyNameMap]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -241,7 +254,7 @@ export default function RequestDetailsTab() {
                 <option value="">All API Keys</option>
                 {apiKeys.map((key) => (
                   <option key={key.id} value={key.id}>
-                    {key.name} ({key.id})
+                    {key.name}
                   </option>
                 ))}
               </select>
@@ -297,7 +310,7 @@ export default function RequestDetailsTab() {
                 <th className="text-left p-4 text-sm font-semibold text-text-main">Timestamp</th>
                 <th className="text-left p-4 text-sm font-semibold text-text-main">Model</th>
                 <th className="text-left p-4 text-sm font-semibold text-text-main">Provider</th>
-                <th className="text-left p-4 text-sm font-semibold text-text-main">API Key ID</th>
+                <th className="text-left p-4 text-sm font-semibold text-text-main">API Key</th>
                 <th className="text-right p-4 text-sm font-semibold text-text-main">Input Tokens</th>
                 <th className="text-right p-4 text-sm font-semibold text-text-main">Output Tokens</th>
                 <th className="text-left p-4 text-sm font-semibold text-text-main">Latency</th>
@@ -337,8 +350,8 @@ export default function RequestDetailsTab() {
                           {getProviderName(detail.provider, providerNameCache)}
                         </span>
                       </td>
-                     <td className="p-4 text-sm text-text-muted font-mono">
-                       {detail.apiKeyId || "-"}
+                     <td className="p-4 text-sm text-text-muted">
+                       {getApiKeyDisplayName(detail.apiKeyId)}
                      </td>
                      <td className="p-4 text-sm text-text-main text-right font-mono">
                       {detail.tokens?.prompt_tokens?.toLocaleString() || 0}
@@ -399,8 +412,8 @@ export default function RequestDetailsTab() {
                 <span className="text-text-main">{new Date(selectedDetail.timestamp).toLocaleString()}</span>
               </div>
                <div>
-                 <span className="text-text-muted">API Key ID:</span>{" "}
-                 <span className="text-text-main font-mono">{selectedDetail.apiKeyId || "-"}</span>
+                 <span className="text-text-muted">API Key:</span>{" "}
+                 <span className="text-text-main">{getApiKeyDisplayName(selectedDetail.apiKeyId)}</span>
                </div>
                <div>
                  <span className="text-text-muted">Provider:</span>{" "}
