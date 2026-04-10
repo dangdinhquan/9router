@@ -1176,8 +1176,17 @@ function ProviderTestResultsView({ results }) {
             {r.valid ? "check_circle" : "error"}
           </span>
           <div className="flex-1 min-w-0">
-            <span className="font-medium">{r.connectionName}</span>
-            <span className="text-text-muted ml-1.5">({r.provider})</span>
+            <div className="font-medium truncate">{r.connectionName}</div>
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              <span className="px-1.5 py-0.5 rounded bg-primary/15 text-primary font-medium">
+                {r.provider}
+              </span>
+              {r.model && (
+                <span className="px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 text-text-muted font-mono">
+                  {r.model}
+                </span>
+              )}
+            </div>
           </div>
           {r.latencyMs !== undefined && (
             <span className="text-text-muted font-mono tabular-nums">

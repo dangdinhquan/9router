@@ -8,6 +8,7 @@ import {
   ANTHROPIC_COMPATIBLE_PREFIX,
 } from "@/shared/constants/providers";
 import { testSingleConnection } from "../[id]/test/testUtils.js";
+import { getDefaultModel } from "open-sse/config/providerModels.js";
 
 function getAuthGroup(providerId, connection = null) {
   // Prioritize authType from connection if available
@@ -83,10 +84,12 @@ export async function POST(request) {
 
     const results = [];
     for (const conn of connectionsToTest) {
+      const testedModel = conn.defaultModel || getDefaultModel(conn.provider) || null;
       try {
         const data = await testSingleConnection(conn.id);
         results.push({
           provider: conn.provider,
+          model: testedModel,
           connectionId: conn.id,
           connectionName: conn.name || conn.email || conn.provider,
           authType: conn.authType || getAuthGroup(conn.provider, conn),
@@ -100,6 +103,7 @@ export async function POST(request) {
       } catch (error) {
         results.push({
           provider: conn.provider,
+          model: testedModel,
           connectionId: conn.id,
           connectionName: conn.name || conn.email || conn.provider,
           authType: conn.authType || getAuthGroup(conn.provider, conn),
