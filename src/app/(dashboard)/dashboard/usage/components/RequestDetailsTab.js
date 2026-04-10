@@ -181,10 +181,10 @@ export default function RequestDetailsTab() {
     setFilters({ provider: "", apiKeyScope: "global", apiKeyId: "", startDate: "", endDate: "" });
   };
 
-  const getApiKeyDisplayName = (apiKeyId) => {
+  const getApiKeyDisplayName = useCallback((apiKeyId) => {
     if (!apiKeyId) return "-";
     return apiKeyNameMap[apiKeyId] || apiKeyId;
-  };
+  }, [apiKeyNameMap]);
 
   return (
     <div className="flex flex-col gap-6">

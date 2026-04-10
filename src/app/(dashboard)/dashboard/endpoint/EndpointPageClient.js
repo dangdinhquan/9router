@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import PropTypes from "prop-types";
 import { Card, Button, Input, Modal, CardSkeleton, Toggle } from "@/shared/components";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
@@ -446,23 +446,23 @@ export default function APIPageClient({ machineId }) {
     setEditAllowedModels([]);
   };
 
-  const addAllowedProvider = (providerId) => {
+  const addAllowedProvider = useCallback((providerId) => {
     if (!providerId) return;
     setEditAllowedProviders((prev) => (prev.includes(providerId) ? prev : [...prev, providerId]));
-  };
+  }, []);
 
-  const removeAllowedProvider = (providerId) => {
+  const removeAllowedProvider = useCallback((providerId) => {
     setEditAllowedProviders((prev) => prev.filter((id) => id !== providerId));
-  };
+  }, []);
 
-  const addAllowedModel = (modelId) => {
+  const addAllowedModel = useCallback((modelId) => {
     if (!modelId) return;
     setEditAllowedModels((prev) => (prev.includes(modelId) ? prev : [...prev, modelId]));
-  };
+  }, []);
 
-  const removeAllowedModel = (modelId) => {
+  const removeAllowedModel = useCallback((modelId) => {
     setEditAllowedModels((prev) => prev.filter((id) => id !== modelId));
-  };
+  }, []);
 
   const handleSaveKeySettings = async () => {
     if (!editingKey) return;
