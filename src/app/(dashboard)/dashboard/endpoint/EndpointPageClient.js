@@ -64,6 +64,39 @@ export default function APIPageClient({ machineId }) {
 
   const { copied, copy } = useCopyToClipboard();
 
+  const providerOptions = useMemo(
+    () =>
+      Object.values(AI_PROVIDERS)
+        .filter((p) => !p.hidden)
+        .map((p) => ({ id: p.id, name: p.name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [],
+  );
+
+  const normalizeKeySettings = (key) => ({
+    quotaMetric: key?.quotaMetric === "tokens" ? "tokens" : "cost",
+    quotaPeriod: ["daily", "weekly", "monthly"].includes(key?.quotaPeriod) ? key.quotaPeriod : "monthly",
+    quotaLimit: key?.quotaLimit === null || key?.quotaLimit === undefined ? "" : String(key.quotaLimit),
+    allowedProviders: Array.isArray(key?.allowedProviders) ? key.allowedProviders : [],
+    allowedModels: Array.isArray(key?.allowedModels) ? key.allowedModels : [],
+  });
+
+  const fetchModelOptions = async () => {
+    try {
+      const res = await fetch("/api/models");
+      const data = await res.json();
+      if (res.ok) {
+        const options = (data.models || []).map((m) => ({
+          id: `${m.provider}/${m.model}`,
+          name: `${m.name || m.model} (${m.provider})`,
+        }));
+        setModelOptions(options);
+      }
+    } catch (error) {
+      console.log("Error fetching model options:", error);
+    }
+  };
+
   useEffect(() => {
     fetchData();
     loadSettings();
@@ -943,35 +976,3 @@ export default function APIPageClient({ machineId }) {
 APIPageClient.propTypes = {
   machineId: PropTypes.string.isRequired,
 };
-  const providerOptions = useMemo(
-    () =>
-      Object.values(AI_PROVIDERS)
-        .filter((p) => !p.hidden)
-        .map((p) => ({ id: p.id, name: p.name }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [],
-  );
-
-  const normalizeKeySettings = (key) => ({
-    quotaMetric: key?.quotaMetric === "tokens" ? "tokens" : "cost",
-    quotaPeriod: ["daily", "weekly", "monthly"].includes(key?.quotaPeriod) ? key.quotaPeriod : "monthly",
-    quotaLimit: key?.quotaLimit === null || key?.quotaLimit === undefined ? "" : String(key.quotaLimit),
-    allowedProviders: Array.isArray(key?.allowedProviders) ? key.allowedProviders : [],
-    allowedModels: Array.isArray(key?.allowedModels) ? key.allowedModels : [],
-  });
-
-  const fetchModelOptions = async () => {
-    try {
-      const res = await fetch("/api/models");
-      const data = await res.json();
-      if (res.ok) {
-        const options = (data.models || []).map((m) => ({
-          id: `${m.provider}/${m.model}`,
-          name: `${m.name || m.model} (${m.provider})`,
-        }));
-        setModelOptions(options);
-      }
-    } catch (error) {
-      console.log("Error fetching model options:", error);
-    }
-  };
