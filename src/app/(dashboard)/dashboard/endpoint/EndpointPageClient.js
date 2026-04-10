@@ -221,8 +221,8 @@ export default function APIPageClient({ machineId }) {
         fetch("/api/providers"),
       ]);
       const [modelsData, providersData] = await Promise.all([
-        modelsRes.json().catch(() => ({})),
-        providersRes.json().catch(() => ({})),
+        modelsRes.json().catch(() => ({ data: [] })),
+        providersRes.json().catch(() => ({ connections: [] })),
       ]);
       if (modelsRes.ok) {
         const aliasToProviderMeta = {};
@@ -708,7 +708,7 @@ export default function APIPageClient({ machineId }) {
     });
   };
 
-  const [baseUrl, setBaseUrl] = useState("");
+  const [baseUrl, setBaseUrl] = useState("/v1");
 
   // Hydration fix: Only access window on client side
   useEffect(() => {
