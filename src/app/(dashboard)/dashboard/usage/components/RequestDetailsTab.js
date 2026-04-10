@@ -106,12 +106,14 @@ export default function RequestDetailsTab() {
 
   const fetchProviders = useCallback(async () => {
     try {
-        const res = await fetch("/api/usage/providers");
-        const data = await res.json();
-        setProviders(data.providers || []);
-        const keyRes = await fetch("/api/keys");
-        const keyData = await keyRes.json();
-        setApiKeys(keyData.keys || []);
+      const res = await fetch("/api/usage/providers");
+      if (!res.ok) throw new Error("Failed to load providers");
+      const data = await res.json();
+      setProviders(data.providers || []);
+      const keyRes = await fetch("/api/keys");
+      if (!keyRes.ok) throw new Error("Failed to load API keys");
+      const keyData = await keyRes.json();
+      setApiKeys(keyData.keys || []);
 
       const cache = await fetchProviderNames();
       setProviderNameCache(cache.providerNameCache);

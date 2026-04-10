@@ -312,8 +312,7 @@ export async function validateApiKeyAccess(apiKey, { providerId, modelId }) {
   if (Number.isFinite(quotaLimit) && quotaLimit > 0) {
     const used = await getApiKeyPeriodUsage(apiKey, metric, quotaPeriod);
     if (used >= quotaLimit) {
-      const unit = metric === "tokens" ? "tokens" : "cost";
-      return { valid: false, status: 429, reason: `API key ${quotaPeriod} ${unit} quota exceeded` };
+      return { valid: false, status: 429, reason: `API key ${quotaPeriod} ${metric} quota exceeded` };
     }
   }
 
