@@ -198,6 +198,12 @@ export default function UsageStats() {
   const [period, setPeriod] = useState("7d");
   const [apiKeyScope, setApiKeyScope] = useState("global");
   const [selectedApiKeyId, setSelectedApiKeyId] = useState("");
+  const apiKeyScopeValue = useMemo(() => {
+    if (apiKeyScope === "api-key") {
+      return selectedApiKeyId ? `api-key:${selectedApiKeyId}` : "api-key:all";
+    }
+    return apiKeyScope;
+  }, [apiKeyScope, selectedApiKeyId]);
 
   // Fetch connected providers once, deduplicate by provider type
   // Always include noAuth free providers (e.g. opencode) regardless of connections
@@ -399,6 +405,16 @@ export default function UsageStats() {
     }
   }, [stats, tableView, sortBy, sortOrder]);
 
+  const providerUsage = useMemo(() => {
+    const usage = {};
+    Object.values(stats?.byModel || {}).forEach((item) => {
+      const providerKey = item?.provider?.toLowerCase();
+      if (!providerKey) return;
+      usage[providerKey] = (usage[providerKey] || 0) + (Number(item.requests) || 0);
+    });
+    return usage;
+  }, [stats?.byModel]);
+
   if (!stats && !loading) return <div className="text-text-muted">Failed to load usage statistics.</div>;
 
   const spinner = (
@@ -411,46 +427,41 @@ export default function UsageStats() {
     <div className="flex flex-col gap-6">
       {/* Top filters */}
       <div className="flex items-center gap-2 self-end flex-wrap justify-end">
-        <div className="flex items-center gap-1 bg-bg-subtle rounded-lg p-1 border border-border">
-          <button
-            onClick={() => {
+        <select
+          value={apiKeyScopeValue}
+          onChange={(e) => {
+            const nextValue = e.target.value;
+            if (nextValue === "global") {
               setApiKeyScope("global");
               setSelectedApiKeyId("");
-            }}
-            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${apiKeyScope === "global" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:text-text hover:bg-bg-hover"}`}
-          >
-            Global
-          </button>
-          <button
-            onClick={() => setApiKeyScope("api-key")}
-            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${apiKeyScope === "api-key" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:text-text hover:bg-bg-hover"}`}
-          >
-            API Key
-          </button>
-          <button
-            onClick={() => {
+              return;
+            }
+            if (nextValue === "no-key") {
               setApiKeyScope("no-key");
               setSelectedApiKeyId("");
-            }}
-            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${apiKeyScope === "no-key" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:text-text hover:bg-bg-hover"}`}
-          >
-            No API Key
-          </button>
-        </div>
-        {apiKeyScope === "api-key" && (
-          <select
-            value={selectedApiKeyId}
-            onChange={(e) => setSelectedApiKeyId(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-border bg-bg-subtle text-sm font-medium text-text focus:outline-none focus:ring-2 focus:ring-primary/50 min-w-[220px]"
-          >
-            <option value="">All API Keys</option>
-            {apiKeys.map((key) => (
-              <option key={key.id} value={key.id}>
-                {key.name}
-              </option>
-            ))}
-          </select>
-        )}
+              return;
+            }
+            if (nextValue === "api-key:all") {
+              setApiKeyScope("api-key");
+              setSelectedApiKeyId("");
+              return;
+            }
+            if (nextValue.startsWith("api-key:")) {
+              setApiKeyScope("api-key");
+              setSelectedApiKeyId(nextValue.slice("api-key:".length));
+            }
+          }}
+          className="px-3 py-1.5 rounded-lg border border-border bg-bg-subtle text-sm font-medium text-text focus:outline-none focus:ring-2 focus:ring-primary/50 min-w-[220px]"
+        >
+          <option value="global">Global</option>
+          <option value="no-key">No API Key</option>
+          <option value="api-key:all">All API Keys</option>
+          {apiKeys.map((key) => (
+            <option key={key.id} value={`api-key:${key.id}`}>
+              {key.name}
+            </option>
+          ))}
+        </select>
         <div className="flex items-center gap-1 bg-bg-subtle rounded-lg p-1 border border-border">
           {PERIODS.map((p) => (
             <button
@@ -479,6 +490,7 @@ export default function UsageStats() {
             activeRequests={stats.activeRequests || []}
             lastProvider={stats.recentRequests?.[0]?.provider || ""}
             errorProvider={stats.errorProvider || ""}
+            providerUsage={providerUsage}
           />
           <RecentRequests requests={stats.recentRequests || []} />
         </div>

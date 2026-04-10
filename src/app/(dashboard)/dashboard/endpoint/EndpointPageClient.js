@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import PropTypes from "prop-types";
 import { Card, Button, Input, Modal, CardSkeleton, Toggle } from "@/shared/components";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
@@ -19,6 +19,134 @@ const TUNNEL_BENEFITS = [
 ];
 
 const TUNNEL_ACTION_TIMEOUT_MS = 90000;
+const FALLBACK_PROVIDER_META = { icon: "hub", color: "#6B7280" };
+
+// Ensure endpoint URLs consistently resolve to a single /v1 base path.
+function normalizeV1Endpoint(url) {
+  const trimmed = (url || "").trim();
+  if (!trimmed) return "/v1";
+  return `${trimmed.replace(/\/+$/, "").replace(/\/v1$/, "")}/v1`;
+}
+
+function SearchableOptionDropdown({
+  triggerText,
+  searchPlaceholder,
+  emptyText,
+  groups,
+  onSelect,
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onClickOutside = (event) => {
+      if (!rootRef.current?.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [isOpen]);
+
+  const filteredGroups = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return groups;
+    return groups
+      .map((group) => {
+        const groupMatches = group.label.toLowerCase().includes(q);
+        const options = group.options.filter((option) => {
+          const haystack = `${option.label} ${option.description || ""}`.toLowerCase();
+          return haystack.includes(q) || groupMatches;
+        });
+        return { ...group, options };
+      })
+      .filter((group) => group.options.length > 0);
+  }, [groups, query]);
+
+  const hasOptions = filteredGroups.some((group) => group.options.length > 0);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => {
+          setIsOpen((prev) => !prev);
+          setQuery("");
+        }}
+        className="w-full h-10 px-3 rounded-lg border border-border bg-bg text-sm text-left flex items-center justify-between gap-2"
+      >
+        <span className="truncate text-text-muted">{triggerText}</span>
+        <span className="material-symbols-outlined text-[18px] text-text-muted">expand_more</span>
+      </button>
+      {isOpen && (
+        <div className="absolute z-40 mt-1 w-full rounded-lg border border-border bg-bg shadow-lg overflow-hidden">
+          <div className="p-2 border-b border-border">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={searchPlaceholder}
+              className="w-full h-9 rounded-md border border-border bg-bg-subtle px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto p-1">
+            {hasOptions ? (
+              filteredGroups.map((group) => (
+                <div key={group.id} className="mb-1 last:mb-0">
+                  <div className="px-2 py-1 text-xs font-semibold text-text-muted uppercase tracking-wide flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[14px]" style={{ color: group.color }}>{group.icon || "hub"}</span>
+                    <span className="truncate">{group.label}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    {group.options.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          onSelect(option.value);
+                          setIsOpen(false);
+                          setQuery("");
+                        }}
+                        className="w-full px-2 py-1.5 rounded-md text-left hover:bg-bg-subtle transition-colors flex items-center justify-between gap-2"
+                      >
+                        <span className="truncate text-sm">{option.label}</span>
+                        {option.description && (
+                          <span className="text-xs text-text-muted truncate">{option.description}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="px-2 py-3 text-sm text-text-muted">{emptyText}</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+SearchableOptionDropdown.propTypes = {
+  triggerText: PropTypes.string.isRequired,
+  searchPlaceholder: PropTypes.string.isRequired,
+  emptyText: PropTypes.string.isRequired,
+  groups: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    label: PropTypes.string.isRequired,
+    icon: PropTypes.string,
+    color: PropTypes.string,
+    options: PropTypes.arrayOf(PropTypes.shape({
+      value: PropTypes.string.isRequired,
+      label: PropTypes.string.isRequired,
+      description: PropTypes.string,
+    })).isRequired,
+  })).isRequired,
+  onSelect: PropTypes.func.isRequired,
+};
 
 export default function APIPageClient({ machineId }) {
   const [keys, setKeys] = useState([]);
@@ -68,7 +196,12 @@ export default function APIPageClient({ machineId }) {
     () =>
       Object.values(AI_PROVIDERS)
         .filter((p) => !p.hidden)
-        .map((p) => ({ id: p.id, name: p.name }))
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          icon: p.icon || "hub",
+          color: p.color || "#6B7280",
+        }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     [],
   );
@@ -83,13 +216,65 @@ export default function APIPageClient({ machineId }) {
 
   const fetchModelOptions = async () => {
     try {
-      const res = await fetch("/api/models");
-      const data = await res.json();
-      if (res.ok) {
-        const options = (data.models || []).map((m) => ({
-          id: `${m.provider}/${m.model}`,
-          name: `${m.name || m.model} (${m.provider})`,
-        }));
+      // Use OpenAI-compatible models endpoint so options match the real API endpoint model list.
+      const [modelsRes, providersRes] = await Promise.all([
+        fetch("/api/v1/models"),
+        fetch("/api/providers"),
+      ]);
+      const [modelsData, providersData] = await Promise.all([
+        modelsRes.json().catch((error) => {
+          console.warn("Failed to parse /api/v1/models response:", error);
+          return { data: [] };
+        }),
+        providersRes.json().catch((error) => {
+          console.warn("Failed to parse /api/providers response:", error);
+          return { connections: [] };
+        }),
+      ]);
+      if (modelsRes.ok) {
+        const aliasToProviderMeta = {};
+        Object.values(AI_PROVIDERS).forEach((provider) => {
+          aliasToProviderMeta[provider.id] = provider;
+          aliasToProviderMeta[provider.alias] = provider;
+        });
+        (providersData?.connections || []).forEach((connection) => {
+          const base = AI_PROVIDERS[connection.provider] || {};
+          const prefix = connection?.providerSpecificData?.prefix;
+          if (prefix) {
+            aliasToProviderMeta[prefix] = {
+              id: connection.provider,
+              name: connection.name || prefix,
+              icon: base.icon || FALLBACK_PROVIDER_META.icon,
+              color: base.color || FALLBACK_PROVIDER_META.color,
+            };
+          }
+        });
+
+        const rawIds = (modelsData.data || [])
+          .map((entry) => String(entry?.id || ""))
+          .filter(Boolean);
+        const validIds = rawIds.filter((id) => id.includes("/"));
+        const invalidCount = rawIds.length - validIds.length;
+        if (invalidCount > 0) {
+          console.warn(`Ignored ${invalidCount} model entries without provider prefix from /api/v1/models`);
+        }
+
+        const options = validIds
+          .map((id) => {
+            const [providerAlias, ...rest] = id.split("/");
+            const modelId = rest.join("/");
+            const providerMeta = aliasToProviderMeta[providerAlias] || FALLBACK_PROVIDER_META;
+            return {
+              id,
+              modelId,
+              providerAlias,
+              providerId: providerMeta.id || providerAlias,
+              providerName: providerMeta.name || providerAlias,
+              providerIcon: providerMeta.icon || FALLBACK_PROVIDER_META.icon,
+              providerColor: providerMeta.color || FALLBACK_PROVIDER_META.color,
+              name: modelId,
+            };
+          });
         setModelOptions(options);
       }
     } catch (error) {
@@ -464,6 +649,41 @@ export default function APIPageClient({ machineId }) {
     setEditAllowedModels((prev) => prev.filter((id) => id !== modelId));
   }, []);
 
+  const availableProviderOptions = useMemo(
+    () => providerOptions.filter((provider) => !editAllowedProviders.includes(provider.id)),
+    [providerOptions, editAllowedProviders],
+  );
+
+  const modelGroups = useMemo(() => {
+    const groups = new Map();
+    modelOptions
+      .filter((model) => !editAllowedModels.includes(model.id))
+      .forEach((model) => {
+        const groupKey = model.providerAlias || model.providerId;
+        if (!groups.has(groupKey)) {
+          groups.set(groupKey, {
+            id: groupKey,
+            label: model.providerName,
+            icon: model.providerIcon,
+            color: model.providerColor,
+            options: [],
+          });
+        }
+        groups.get(groupKey).options.push({
+          value: model.id,
+          label: model.name,
+          description: model.providerAlias,
+        });
+      });
+
+    return Array.from(groups.values())
+      .map((group) => ({
+        ...group,
+        options: group.options.sort((a, b) => a.label.localeCompare(b.label)),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [modelOptions, editAllowedModels]);
+
   const handleSaveKeySettings = async () => {
     if (!editingKey) return;
     try {
@@ -507,7 +727,7 @@ export default function APIPageClient({ machineId }) {
   // Hydration fix: Only access window on client side
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setBaseUrl(`${window.location.origin}/v1`);
+      setBaseUrl(window.location.origin);
     }
   }, []);
 
@@ -520,7 +740,7 @@ export default function APIPageClient({ machineId }) {
     );
   }
 
-  const currentEndpoint = tunnelEnabled && tunnelPublicUrl ? `${tunnelPublicUrl}/v1` : baseUrl;
+  const currentEndpoint = normalizeV1Endpoint(tunnelEnabled && tunnelPublicUrl ? tunnelPublicUrl : baseUrl);
 
   return (
     <div className="flex flex-col gap-8">
@@ -843,22 +1063,24 @@ export default function APIPageClient({ machineId }) {
 
           <div>
             <label className="block text-sm font-medium mb-1">Allowed Providers</label>
-            <select
-              value=""
-              onChange={(e) => {
-                addAllowedProvider(e.target.value);
-              }}
-              className="w-full h-10 rounded-lg border border-border bg-bg px-3 text-sm"
-            >
-              <option value="" disabled>Select provider to add...</option>
-              {providerOptions
-                .filter((provider) => !editAllowedProviders.includes(provider.id))
-                .map((provider) => (
-                  <option key={provider.id} value={provider.id}>
-                    {provider.name}
-                  </option>
-                ))}
-            </select>
+            <SearchableOptionDropdown
+              triggerText="Select provider to add..."
+              searchPlaceholder="Search providers..."
+              emptyText="No providers available."
+              groups={[
+                {
+                  id: "providers",
+                  label: "Providers",
+                  icon: "hub",
+                  color: "#6B7280",
+                  options: availableProviderOptions.map((provider) => ({
+                    value: provider.id,
+                    label: provider.name,
+                  })),
+                },
+              ]}
+              onSelect={addAllowedProvider}
+            />
             <div className="flex flex-wrap gap-2 mt-2 min-h-6">
               {editAllowedProviders.length === 0 ? (
                 <span className="text-xs text-text-muted">All providers allowed.</span>
@@ -886,22 +1108,13 @@ export default function APIPageClient({ machineId }) {
 
           <div>
             <label className="block text-sm font-medium mb-1">Allowed Models</label>
-            <select
-              value=""
-              onChange={(e) => {
-                addAllowedModel(e.target.value);
-              }}
-              className="w-full h-10 rounded-lg border border-border bg-bg px-3 text-sm"
-            >
-              <option value="" disabled>Select model to add...</option>
-              {modelOptions
-                .filter((model) => !editAllowedModels.includes(model.id))
-                .map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.name}
-                  </option>
-                ))}
-            </select>
+            <SearchableOptionDropdown
+              triggerText="Select model to add..."
+              searchPlaceholder="Search models or providers..."
+              emptyText="No models available."
+              groups={modelGroups}
+              onSelect={addAllowedModel}
+            />
             <div className="flex flex-wrap gap-2 mt-2 min-h-6">
               {editAllowedModels.length === 0 ? (
                 <span className="text-xs text-text-muted">All models allowed.</span>
