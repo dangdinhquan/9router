@@ -216,7 +216,7 @@ export default function APIPageClient({ machineId }) {
     const groups = new Map();
     allowedModels.forEach((modelId) => {
       const model = modelMetaMap.get(modelId);
-      const providerKey = model?.providerAlias || model?.providerId || modelId.split("/")[0] || "other";
+      const providerKey = model?.providerAlias || model?.providerId || modelId?.split("/")?.[0] || "other";
       const providerLabel = model?.providerName || providerKey;
       if (!groups.has(providerKey)) {
         groups.set(providerKey, { providerKey, providerLabel, models: [] });
@@ -236,7 +236,7 @@ export default function APIPageClient({ machineId }) {
     const numericLimit = Number(limitValue);
     const displayLimit = Number.isFinite(numericLimit) ? numericLimit : limitValue;
     if (metric === "cost") return `$${displayLimit}/${period}`;
-    const tokenLabel = Number.isFinite(numericLimit) && numericLimit === 1 ? "token" : "tokens";
+    const tokenLabel = (displayLimit === 1 || displayLimit === "1") ? "token" : "tokens";
     return `${displayLimit} ${tokenLabel}/${period}`;
   }, []);
 
