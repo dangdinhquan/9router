@@ -80,7 +80,9 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
         return;
       }
 
-      await new Promise((r) => setTimeout(r, interval * 1000));
+      if (i > 0) {
+        await new Promise((r) => setTimeout(r, interval * 1000));
+      }
 
       // Check again after sleep
       if (pollingAbortRef.current) {
@@ -155,8 +157,14 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
         const verifyUrl = data.verification_uri_complete || data.verification_uri;
         if (verifyUrl) window.open(verifyUrl, "_blank");
 
-        // Pass extraData for Kiro (contains _clientId, _clientSecret)
-        const extraData = provider === "kiro" ? { _clientId: data._clientId, _clientSecret: data._clientSecret } : null;
+        // Pass extraData for Kiro (contains client creds + region/context for IDC polling)
+        const extraData = provider === "kiro" ? {
+          _clientId: data._clientId,
+          _clientSecret: data._clientSecret,
+          _region: data._region,
+          _startUrl: data._startUrl,
+          _authMethod: data._authMethod,
+        } : null;
         startPolling(data.device_code, data.codeVerifier, data.interval || 5, extraData);
         return;
       }

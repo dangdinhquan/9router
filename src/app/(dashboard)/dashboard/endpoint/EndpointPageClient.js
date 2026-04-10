@@ -446,6 +446,24 @@ export default function APIPageClient({ machineId }) {
     setEditAllowedModels([]);
   };
 
+  const addAllowedProvider = (providerId) => {
+    if (!providerId) return;
+    setEditAllowedProviders((prev) => (prev.includes(providerId) ? prev : [...prev, providerId]));
+  };
+
+  const removeAllowedProvider = (providerId) => {
+    setEditAllowedProviders((prev) => prev.filter((id) => id !== providerId));
+  };
+
+  const addAllowedModel = (modelId) => {
+    if (!modelId) return;
+    setEditAllowedModels((prev) => (prev.includes(modelId) ? prev : [...prev, modelId]));
+  };
+
+  const removeAllowedModel = (modelId) => {
+    setEditAllowedModels((prev) => prev.filter((id) => id !== modelId));
+  };
+
   const handleSaveKeySettings = async () => {
     if (!editingKey) return;
     try {
@@ -786,6 +804,7 @@ export default function APIPageClient({ machineId }) {
         isOpen={!!editingKey}
         title={editingKey ? `Manage ${editingKey.name}` : "Manage API Key"}
         onClose={closeManageKey}
+        size="xl"
       >
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -825,34 +844,86 @@ export default function APIPageClient({ machineId }) {
           <div>
             <label className="block text-sm font-medium mb-1">Allowed Providers</label>
             <select
-              multiple
-              value={editAllowedProviders}
-              onChange={(e) => setEditAllowedProviders(Array.from(e.target.selectedOptions, (o) => o.value))}
-              className="w-full min-h-28 rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+              value=""
+              onChange={(e) => {
+                addAllowedProvider(e.target.value);
+              }}
+              className="w-full h-10 rounded-lg border border-border bg-bg px-3 text-sm"
             >
-              {providerOptions.map((provider) => (
-                <option key={provider.id} value={provider.id}>
-                  {provider.name}
-                </option>
-              ))}
+              <option value="" disabled>Select provider to add...</option>
+              {providerOptions
+                .filter((provider) => !editAllowedProviders.includes(provider.id))
+                .map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.name}
+                  </option>
+                ))}
             </select>
+            <div className="flex flex-wrap gap-2 mt-2 min-h-6">
+              {editAllowedProviders.length === 0 ? (
+                <span className="text-xs text-text-muted">All providers allowed.</span>
+              ) : (
+                editAllowedProviders.map((providerId) => {
+                  const provider = providerOptions.find((p) => p.id === providerId);
+                  return (
+                    <span key={providerId} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-bg-subtle text-xs border border-border">
+                      {provider?.name || providerId}
+                      <button
+                        type="button"
+                        onClick={() => removeAllowedProvider(providerId)}
+                        className="material-symbols-outlined text-[14px] text-text-muted hover:text-text-main"
+                        aria-label={`Remove ${provider?.name || providerId}`}
+                      >
+                        close
+                      </button>
+                    </span>
+                  );
+                })
+              )}
+            </div>
             <p className="text-xs text-text-muted mt-1">Leave empty to allow all providers.</p>
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">Allowed Models</label>
             <select
-              multiple
-              value={editAllowedModels}
-              onChange={(e) => setEditAllowedModels(Array.from(e.target.selectedOptions, (o) => o.value))}
-              className="w-full min-h-32 rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+              value=""
+              onChange={(e) => {
+                addAllowedModel(e.target.value);
+              }}
+              className="w-full h-10 rounded-lg border border-border bg-bg px-3 text-sm"
             >
-              {modelOptions.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name}
-                </option>
-              ))}
+              <option value="" disabled>Select model to add...</option>
+              {modelOptions
+                .filter((model) => !editAllowedModels.includes(model.id))
+                .map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
             </select>
+            <div className="flex flex-wrap gap-2 mt-2 min-h-6">
+              {editAllowedModels.length === 0 ? (
+                <span className="text-xs text-text-muted">All models allowed.</span>
+              ) : (
+                editAllowedModels.map((modelId) => {
+                  const model = modelOptions.find((m) => m.id === modelId);
+                  return (
+                    <span key={modelId} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-bg-subtle text-xs border border-border">
+                      {model?.name || modelId}
+                      <button
+                        type="button"
+                        onClick={() => removeAllowedModel(modelId)}
+                        className="material-symbols-outlined text-[14px] text-text-muted hover:text-text-main"
+                        aria-label={`Remove ${model?.name || modelId}`}
+                      >
+                        close
+                      </button>
+                    </span>
+                  );
+                })
+              )}
+            </div>
             <p className="text-xs text-text-muted mt-1">Leave empty to allow all models.</p>
           </div>
 

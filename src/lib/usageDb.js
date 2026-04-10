@@ -561,6 +561,15 @@ export async function getUsageStats(period = "all", options = {}) {
     };
   }
 
+  if (options.apiKeyId) {
+    const selectedKey = allApiKeys.find((key) => key.id === options.apiKeyId);
+    history = history.filter((entry) => {
+      if (entry.apiKeyId && entry.apiKeyId === options.apiKeyId) return true;
+      if (!selectedKey) return false;
+      return entry.apiKey === selectedKey.key;
+    });
+  }
+
   // 20 most recent requests from history (always in sync with SSE emit)
   const seen = new Set();
   const recentRequests = [...history]
