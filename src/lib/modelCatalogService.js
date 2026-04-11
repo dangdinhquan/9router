@@ -222,7 +222,7 @@ function extractProviderEntries(payload) {
 export function normalizeRemoteCatalogPayload(payload) {
   const providerEntries = extractProviderEntries(payload);
   if (providerEntries.length === 0) {
-    throw new Error("Invalid model catalog schema");
+    throw new Error("Invalid model catalog schema: expected providers object or models array");
   }
 
   const providers = {};
@@ -237,7 +237,7 @@ export function normalizeRemoteCatalogPayload(payload) {
   }
 
   if (Object.keys(providers).length === 0) {
-    throw new Error("No supported provider models found");
+    throw new Error("No supported provider models found in catalog response");
   }
 
   for (const [providerId, models] of Object.entries(providers)) {
@@ -332,7 +332,7 @@ async function ensureInitialized() {
       ...persisted,
     };
   } catch (error) {
-    console.warn("Model catalog cache restore failed:", error?.message || "unknown error");
+    console.warn("Model catalog cache restore failed, using default empty cache:", error?.message || "unknown error");
   } finally {
     state.initialized = true;
   }

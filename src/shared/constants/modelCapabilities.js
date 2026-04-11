@@ -8,7 +8,7 @@ export const MODEL_CAPABILITY_META = {
   audio_input: { icon: "mic", label: "Audio Input" },
   audio_output: { icon: "speaker", label: "Audio Output" },
   image_input: { icon: "image", label: "Image Input" },
-  image_output: { icon: "imagesmode", label: "Image Output" },
+  image_output: { icon: "image", label: "Image Output" },
   json_mode: { icon: "data_object", label: "JSON Mode" },
   streaming: { icon: "air", label: "Streaming" },
 };

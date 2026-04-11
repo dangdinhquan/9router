@@ -9,7 +9,7 @@ describe("settings model catalog persistence", () => {
   let tempHome = "";
 
   beforeEach(async () => {
-    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "router-settings-"));
+    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "router-model-catalog-test-"));
     process.env.HOME = tempHome;
     process.env.APPDATA = "";
     vi.resetModules();

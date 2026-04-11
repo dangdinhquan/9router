@@ -713,7 +713,7 @@ export default function ProfilePage() {
               <div>
                 <p className="font-medium">Catalog TTL (minutes)</p>
                 <p className="text-sm text-text-muted">
-                  Refresh cache every 5 to 10080 minutes (default 720).
+                  Refresh cache every 5 to 10080 minutes (default 720 = 12 hours; max = 7 days).
                 </p>
               </div>
               <Input
