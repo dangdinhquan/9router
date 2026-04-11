@@ -1047,6 +1047,21 @@ Notes:
 - Optional request/translator logs: `<repo>/logs/...` when `ENABLE_REQUEST_LOGS=true`.
 - Usage storage currently follows `~/.9router` path logic and is independent from `DATA_DIR`.
 
+### Dynamic model catalog metadata
+
+- 9Router now merges static model definitions with dynamic metadata from `https://models.dev/api.json`.
+- If remote fetch fails, schema is invalid, or network is offline, app keeps working with static fallback models.
+- Settings → Profile → **Model Catalog**:
+  - `ENABLE_DYNAMIC_MODEL_CATALOG` toggle (default `true`)
+  - `MODEL_CATALOG_TTL_MINUTES` cache TTL (default `720`, clamped to `5..10080`)
+- Catalog cache behavior:
+  - in-memory cache for fast reads
+  - persisted snapshot in local DB for restart/offline resilience
+  - stale-while-refresh: stale data is served first while refresh happens in background
+- Provider model list UI now shows:
+  - context window tokens (compact format like `200k`)
+  - capability icons (with labels/tooltips): vision, tools/function-calling, reasoning, code, audio, image, JSON mode, streaming
+
 </details>
 
 ---
@@ -1208,4 +1223,3 @@ MIT License - see [LICENSE](LICENSE) for details.
 <div align="center">
   <sub>Built with ❤️ for developers who code 24/7</sub>
 </div>
-

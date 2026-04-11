@@ -6,6 +6,7 @@ import { Card, Button, Modal } from "@/shared/components";
 import { getModelsByProviderId } from "@/shared/constants/models";
 import { getProviderAlias } from "@/shared/constants/providers";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
+import { getCapabilityDisplay, formatContextWindow } from "@/shared/utils/modelCatalogPresentation";
 
 // ── ModelRow ───────────────────────────────────────────────────
 export function ModelRow({ model, fullModel, copied, onCopy, testStatus, isCustom, isFree, onDeleteAlias, onTest, isTesting }) {
@@ -44,6 +45,29 @@ export function ModelRow({ model, fullModel, copied, onCopy, testStatus, isCusto
           <button onClick={onDeleteAlias} className="p-0.5 hover:bg-red-500/10 rounded text-text-muted hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ml-auto" title="Remove custom model">
             <span className="material-symbols-outlined text-sm">close</span>
           </button>
+        )}
+      </div>
+      <div className="mt-2 pl-6 flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sidebar/70">
+          <span className="material-symbols-outlined text-[13px]">token</span>
+          {formatContextWindow(model.contextWindow)}
+        </span>
+        {Array.isArray(model.capabilities) && model.capabilities.length > 0 ? (
+          model.capabilities.map((capability) => {
+            const display = getCapabilityDisplay(capability);
+            return (
+              <span
+                key={`${model.id}-${display.key}`}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sidebar/70"
+                title={display.label}
+              >
+                <span className="material-symbols-outlined text-[13px]">{display.icon}</span>
+                <span>{display.label}</span>
+              </span>
+            );
+          })
+        ) : (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-sidebar/70">—</span>
         )}
       </div>
     </div>
@@ -113,19 +137,25 @@ export default function ModelsCard({ providerId, kindFilter }) {
   const [testError, setTestError] = useState("");
   const [showAddCustomModel, setShowAddCustomModel] = useState(false);
   const [connections, setConnections] = useState([]);
+  const [catalogProviders, setCatalogProviders] = useState(null);
 
   const providerAlias = getProviderAlias(providerId);
 
   const fetchData = useCallback(async () => {
     try {
-      const [aliasRes, connRes] = await Promise.all([
+      const [aliasRes, connRes, catalogRes] = await Promise.all([
         fetch("/api/models/alias"),
         fetch("/api/providers", { cache: "no-store" }),
+        fetch("/api/models/catalog", { cache: "no-store" }),
       ]);
       const aliasData = await aliasRes.json();
       const connData = await connRes.json();
       if (aliasRes.ok) setModelAliases(aliasData.aliases || {});
       if (connRes.ok) setConnections((connData.connections || []).filter((c) => c.provider === providerId));
+      if (catalogRes.ok) {
+        const catalogData = await catalogRes.json();
+        setCatalogProviders(catalogData.providers || null);
+      }
     } catch (e) { console.log("ModelsCard fetch error:", e); }
   }, [providerId]);
 
@@ -169,7 +199,11 @@ export default function ModelsCard({ providerId, kindFilter }) {
   };
 
   // Get models — filter by kindFilter if provided
-  const allModels = getModelsByProviderId(providerId);
+  const staticModels = getModelsByProviderId(providerId);
+  const providerCatalogModels = catalogProviders?.[providerId];
+  const allModels = Array.isArray(providerCatalogModels) && providerCatalogModels.length > 0
+    ? providerCatalogModels
+    : staticModels;
   const displayModels = kindFilter
     ? allModels.filter((m) => {
         if (m.kinds) return m.kinds.includes(kindFilter);

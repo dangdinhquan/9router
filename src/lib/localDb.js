@@ -51,6 +51,14 @@ const defaultData = {
   mitmAlias: {},
   combos: [],
   apiKeys: [],
+  modelCatalogCache: {
+    etag: null,
+    fetchedAt: null,
+    providers: {},
+    lastRefreshAt: null,
+    lastRefreshStatus: "idle",
+    lastError: null,
+  },
   settings: {
     cloudEnabled: false,
     tunnelEnabled: false,
@@ -69,6 +77,8 @@ const defaultData = {
     outboundProxyUrl: "",
     outboundNoProxy: "",
     mitmRouterBaseUrl: DEFAULT_MITM_ROUTER_BASE,
+    ENABLE_DYNAMIC_MODEL_CATALOG: true,
+    MODEL_CATALOG_TTL_MINUTES: 720,
   },
   pricing: {} // NEW: pricing configuration
 };
@@ -87,6 +97,14 @@ function cloneDefaultData() {
     mitmAlias: {},
     combos: [],
     apiKeys: [],
+    modelCatalogCache: {
+      etag: null,
+      fetchedAt: null,
+      providers: {},
+      lastRefreshAt: null,
+      lastRefreshStatus: "idle",
+      lastError: null,
+    },
     settings: {
       cloudEnabled: false,
       tunnelEnabled: false,
@@ -105,6 +123,8 @@ function cloneDefaultData() {
       outboundProxyUrl: "",
       outboundNoProxy: "",
       mitmRouterBaseUrl: DEFAULT_MITM_ROUTER_BASE,
+      ENABLE_DYNAMIC_MODEL_CATALOG: true,
+      MODEL_CATALOG_TTL_MINUTES: 720,
     },
     pricing: {},
   };
@@ -1033,7 +1053,32 @@ export async function cleanupProviderConnections() {
  */
 export async function getSettings() {
   const db = await getDb();
-  return db.data.settings || { cloudEnabled: false };
+  const defaults = cloneDefaultData().settings;
+  const current = db.data.settings || {};
+  return {
+    ...defaults,
+    ...current,
+  };
+}
+
+function clampNumber(value, min, max, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function sanitizeSettingsUpdates(updates = {}) {
+  const next = { ...updates };
+
+  if (Object.prototype.hasOwnProperty.call(next, "ENABLE_DYNAMIC_MODEL_CATALOG")) {
+    next.ENABLE_DYNAMIC_MODEL_CATALOG = next.ENABLE_DYNAMIC_MODEL_CATALOG !== false;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(next, "MODEL_CATALOG_TTL_MINUTES")) {
+    next.MODEL_CATALOG_TTL_MINUTES = clampNumber(next.MODEL_CATALOG_TTL_MINUTES, 5, 10080, 720);
+  }
+
+  return next;
 }
 
 /**
@@ -1041,12 +1086,34 @@ export async function getSettings() {
  */
 export async function updateSettings(updates) {
   const db = await getDb();
+  const sanitizedUpdates = sanitizeSettingsUpdates(updates);
   db.data.settings = {
     ...db.data.settings,
-    ...updates
+    ...sanitizedUpdates
   };
   await safeWrite(db);
   return db.data.settings;
+}
+
+export async function getModelCatalogCache() {
+  const db = await getDb();
+  const defaults = cloneDefaultData().modelCatalogCache;
+  return {
+    ...defaults,
+    ...(db.data.modelCatalogCache || {}),
+  };
+}
+
+export async function setModelCatalogCache(cache = {}) {
+  const db = await getDb();
+  const defaults = cloneDefaultData().modelCatalogCache;
+  db.data.modelCatalogCache = {
+    ...defaults,
+    ...(db.data.modelCatalogCache || {}),
+    ...cache,
+  };
+  await safeWrite(db);
+  return db.data.modelCatalogCache;
 }
 
 /**
