@@ -44,6 +44,19 @@ const capabilityAliasMap = {
   json: "json_mode",
 };
 
+const BOOLEAN_CAPABILITY_FIELDS = [
+  ["vision", "vision"],
+  ["tools", "tools"],
+  ["reasoning", "reasoning"],
+  ["streaming", "streaming"],
+  ["code", "code"],
+];
+
+const BOOLEAN_CAPABILITY_FIELD_ALIASES = [
+  [["function_calling", "functionCalling"], "function_calling"],
+  [["json_mode", "jsonMode"], "json_mode"],
+];
+
 function clampTtlMinutes(value) {
   const parsed = Number.parseInt(value, 10);
   if (Number.isNaN(parsed)) return DEFAULT_TTL_MINUTES;
@@ -90,13 +103,15 @@ function collectCapabilities(raw) {
     }
   }
 
-  if (raw?.vision === true) found.add("vision");
-  if (raw?.tools === true) found.add("tools");
-  if (raw?.function_calling === true || raw?.functionCalling === true) found.add("function_calling");
-  if (raw?.reasoning === true) found.add("reasoning");
-  if (raw?.streaming === true) found.add("streaming");
-  if (raw?.json_mode === true || raw?.jsonMode === true) found.add("json_mode");
-  if (raw?.code === true) found.add("code");
+  for (const [field, capability] of BOOLEAN_CAPABILITY_FIELDS) {
+    if (raw?.[field] === true) found.add(capability);
+  }
+
+  for (const [fields, capability] of BOOLEAN_CAPABILITY_FIELD_ALIASES) {
+    if (fields.some((field) => raw?.[field] === true)) {
+      found.add(capability);
+    }
+  }
 
   return Array.from(found);
 }
@@ -118,15 +133,19 @@ function resolveProviderId(rawProvider) {
   const normalized = rawProvider.trim().toLowerCase().replace(/[\s_]+/g, "-");
   const mapped = providerNameMap[normalized] || normalized;
 
-  if (PROVIDER_ID_TO_ALIAS[mapped]) return mapped;
-  if (aliasToProviderId[mapped]) return aliasToProviderId[mapped];
+  const tryResolveProviderKey = (providerKey) => {
+    if (!providerKey) return null;
+    if (PROVIDER_ID_TO_ALIAS[providerKey]) return providerKey;
+    if (aliasToProviderId[providerKey]) return aliasToProviderId[providerKey];
+    return null;
+  };
+
+  const direct = tryResolveProviderKey(mapped);
+  if (direct) return direct;
 
   // handle namespaced values like "openai/gpt-4o"
   const firstSegment = mapped.split("/")[0];
-  if (PROVIDER_ID_TO_ALIAS[firstSegment]) return firstSegment;
-  if (aliasToProviderId[firstSegment]) return aliasToProviderId[firstSegment];
-
-  return null;
+  return tryResolveProviderKey(firstSegment);
 }
 
 function normalizeRemoteModel(rawModel, providerHint) {

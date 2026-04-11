@@ -723,9 +723,13 @@ export default function ProfilePage() {
                 value={settings.MODEL_CATALOG_TTL_MINUTES ?? 720}
                 onChange={(e) => {
                   const nextValue = e.target.value;
+                  if (nextValue === "") return;
+                  const parsed = Number.parseInt(nextValue, 10);
+                  if (Number.isNaN(parsed)) return;
+                  const bounded = Math.min(10080, Math.max(5, parsed));
                   setSettings((prev) => ({
                     ...prev,
-                    MODEL_CATALOG_TTL_MINUTES: nextValue === "" ? "" : Number(nextValue),
+                    MODEL_CATALOG_TTL_MINUTES: bounded,
                   }));
                 }}
                 onBlur={(e) => updateModelCatalogTtl(e.target.value)}
