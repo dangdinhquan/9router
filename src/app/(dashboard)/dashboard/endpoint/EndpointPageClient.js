@@ -1460,11 +1460,7 @@ function ProviderModelSelectionSection({ title, models, selected, onToggle }) {
       }));
   }, [models]);
 
-  const [expandedProviders, setExpandedProviders] = useState(() => {
-    const initial = {};
-    for (const group of groupedModels) initial[group.provider] = false;
-    return initial;
-  });
+  const [expandedProviders, setExpandedProviders] = useState({});
 
   useEffect(() => {
     setExpandedProviders((prev) => {

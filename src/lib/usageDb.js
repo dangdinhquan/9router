@@ -526,6 +526,7 @@ export async function getUsageStats(period = "all", options = {}) {
 
   if (options.apiKeyName) {
     history = history.filter((entry) => {
+      // No-key traffic is tracked as "Local (No API Key)", not "Unknown API Key"
       if (!entry.apiKey) return options.apiKeyName === "Local (No API Key)";
       const keyInfo = apiKeyMap[entry.apiKey];
       if (options.apiKeyName === "Unknown API Key") {

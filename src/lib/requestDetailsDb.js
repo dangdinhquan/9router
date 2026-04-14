@@ -236,12 +236,13 @@ export async function getRequestDetails(filter = {}) {
 
   if (filter.apiKeyName) {
     records = records.filter((r) => {
+      // No-key traffic is tracked as "Local (No API Key)", not "Unknown API Key"
       if (!r.apiKey) return filter.apiKeyName === "Local (No API Key)";
-      const keyName = apiKeyMap[r.apiKey];
+      const keyInfo = apiKeyMap[r.apiKey];
       if (filter.apiKeyName === "Unknown API Key") {
-        return !keyName;
+        return !keyInfo;
       }
-      return (keyName || "Unknown API Key") === filter.apiKeyName;
+      return (keyInfo || "Unknown API Key") === filter.apiKeyName;
     });
   }
 
