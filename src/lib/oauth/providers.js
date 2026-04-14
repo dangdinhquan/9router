@@ -25,6 +25,8 @@ import {
   CODEBUDDY_CONFIG,
 } from "./constants/oauth";
 
+const BASE64_PADDING_GROUP = 4;
+
 /**
  * Decode JWT access token and extract a stable account identifier for display/upsert.
  * @param {string} accessToken
@@ -36,7 +38,8 @@ function extractEmailFromAccessToken(accessToken) {
     const parts = accessToken.split(".");
     if (parts.length !== 3) return null;
     const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const missingPadding = (BASE64_PADDING_GROUP - (base64.length % BASE64_PADDING_GROUP)) % BASE64_PADDING_GROUP;
+    const padded = base64 + "=".repeat(missingPadding);
     const payload = JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
     return payload.email || payload.preferred_username || payload.sub || null;
   } catch {
