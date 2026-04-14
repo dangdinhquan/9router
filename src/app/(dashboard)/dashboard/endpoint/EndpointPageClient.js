@@ -1466,7 +1466,10 @@ function ProviderModelSelectionSection({ title, models, selected, onToggle }) {
     setExpandedProviders((prev) => {
       const next = { ...prev };
       for (const group of groupedModels) {
-        if (next[group.provider] === undefined) next[group.provider] = false;
+        if (next[group.provider] === undefined) {
+          const hasSelectedModel = group.models.some((model) => selectedIds.includes(model.fullModel));
+          next[group.provider] = hasSelectedModel;
+        }
       }
       for (const key of Object.keys(next)) {
         if (!groupedModels.some((g) => g.provider === key)) delete next[key];
