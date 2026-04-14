@@ -25,6 +25,20 @@ import {
   CODEBUDDY_CONFIG,
 } from "./constants/oauth";
 
+function extractEmailFromAccessToken(accessToken) {
+  try {
+    if (!accessToken || typeof accessToken !== "string") return null;
+    const parts = accessToken.split(".");
+    if (parts.length !== 3) return null;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const payload = JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
+    return payload.email || payload.preferred_username || payload.sub || null;
+  } catch {
+    return null;
+  }
+}
+
 // Provider configurations
 const PROVIDERS = {
   claude: {
@@ -774,10 +788,12 @@ const PROVIDERS = {
       };
     },
     mapTokens: (tokens) => {
+      const email = extractEmailFromAccessToken(tokens.access_token);
       const mapped = {
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
         expiresIn: tokens.expires_in,
+        ...(email ? { email } : {}),
         providerSpecificData: {
           profileArn: tokens?.profile_arn || null,
           clientId: tokens._clientId,
