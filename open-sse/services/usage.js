@@ -672,8 +672,13 @@ async function getKiroUsage(accessToken, providerSpecificData) {
     };
   }
 
+  const fallbackMessage =
+    errors.length > 0
+      ? `Unable to fetch Kiro usage right now. (${errors[errors.length - 1]})`
+      : "Unable to fetch Kiro usage right now.";
+
   return {
-    message: `Unable to fetch Kiro usage right now. ${errors.length > 0 ? `(${errors[errors.length - 1]})` : ""}`.trim(),
+    message: fallbackMessage,
     quotas: {},
   };
 }
