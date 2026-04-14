@@ -256,9 +256,8 @@ const PERIOD_MS = {
 
 function getQuotaCutoff(period) {
   if (period === "monthly") {
-    const now = new Date();
-    const monthAgo = new Date(now.getTime());
-    monthAgo.setFullYear(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    const monthAgo = new Date();
+    monthAgo.setMonth(monthAgo.getMonth() - 1);
     return monthAgo.toISOString();
   }
   return new Date(Date.now() - PERIOD_MS[period]).toISOString();

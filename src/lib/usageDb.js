@@ -528,6 +528,9 @@ export async function getUsageStats(period = "all", options = {}) {
     history = history.filter((entry) => {
       if (!entry.apiKey) return options.apiKeyName === "Local (No API Key)";
       const keyInfo = apiKeyMap[entry.apiKey];
+      if (options.apiKeyName === "Unknown API Key") {
+        return !keyInfo;
+      }
       return (keyInfo?.name || "Unknown API Key") === options.apiKeyName;
     });
   }

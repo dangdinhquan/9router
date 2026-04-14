@@ -1444,7 +1444,10 @@ function ProviderModelSelectionSection({ title, models, selected, onToggle }) {
   const groupedModels = useMemo(() => {
     const groups = {};
     for (const model of (models || [])) {
-      const provider = model.provider || (typeof model.fullModel === "string" ? model.fullModel.split("/")[0] : "unknown");
+      const fullModel = typeof model.fullModel === "string" ? model.fullModel : "";
+      const parts = fullModel.split("/");
+      const parsedProvider = parts.length >= 2 && parts[0] ? parts[0] : null;
+      const provider = model.provider || parsedProvider || "unknown";
       if (!groups[provider]) groups[provider] = [];
       groups[provider].push(model);
     }
