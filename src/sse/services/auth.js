@@ -252,8 +252,17 @@ export async function clearAccountError(connectionId, currentConnection, model =
 const PERIOD_MS = {
   daily: 24 * 60 * 60 * 1000,
   weekly: 7 * 24 * 60 * 60 * 1000,
-  monthly: 30 * 24 * 60 * 60 * 1000,
 };
+
+function getQuotaCutoff(period) {
+  if (period === "monthly") {
+    const now = new Date();
+    const monthAgo = new Date(now);
+    monthAgo.setMonth(now.getMonth() - 1);
+    return monthAgo.toISOString();
+  }
+  return new Date(Date.now() - PERIOD_MS[period]).toISOString();
+}
 
 function getApiKeyPolicy(apiKeyData) {
   const policy = apiKeyData?.policy || {};
@@ -281,7 +290,7 @@ async function checkApiKeyQuota(keyRecord, rawApiKey) {
   }
 
   const { getUsageHistory } = await import("@/lib/usageDb.js");
-  const cutoff = new Date(Date.now() - PERIOD_MS[period]).toISOString();
+  const cutoff = getQuotaCutoff(period);
   const history = await getUsageHistory({ startDate: cutoff });
 
   let used = 0;

@@ -45,6 +45,16 @@ function normalizePolicy(policy) {
   };
 }
 
+function hasKeyPolicyRestrictions(key) {
+  const restrictions = key?.policy?.restrictions || {};
+  return Boolean(
+    key?.policy?.quota?.metric ||
+    (restrictions.providers?.length || 0) > 0 ||
+    (restrictions.connectionIds?.length || 0) > 0 ||
+    (restrictions.models?.length || 0) > 0
+  );
+}
+
 export default function APIPageClient({ machineId }) {
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -925,7 +935,7 @@ export default function APIPageClient({ machineId }) {
                   <p className="text-xs text-text-muted mt-1">
                     Created {new Date(key.createdAt).toLocaleDateString()}
                   </p>
-                  {(key.policy?.quota?.metric || (key.policy?.restrictions?.providers?.length || 0) > 0 || (key.policy?.restrictions?.connectionIds?.length || 0) > 0 || (key.policy?.restrictions?.models?.length || 0) > 0) && (
+                  {hasKeyPolicyRestrictions(key) && (
                     <p className="text-xs text-text-muted mt-1">
                       Policy: {key.policy?.quota?.metric ? `${key.policy.quota.metric}/${key.policy.quota.period}` : "no quota"}
                       {` • providers ${key.policy?.restrictions?.providers?.length || 0}`}

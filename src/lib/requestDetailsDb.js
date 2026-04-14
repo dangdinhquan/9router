@@ -259,7 +259,7 @@ export async function getRequestDetails(filter = {}) {
   const totalPages = Math.ceil(totalItems / pageSize);
   const details = records.slice((page - 1) * pageSize, page * pageSize).map((record) => ({
     ...record,
-    keyName: record.apiKey ? (apiKeyMap[record.apiKey] || `${record.apiKey.slice(0, 8)}...`) : "Local (No API Key)",
+    keyName: record.apiKey ? (apiKeyMap[record.apiKey] || "Unknown API Key") : "Local (No API Key)",
   }));
 
   return {
