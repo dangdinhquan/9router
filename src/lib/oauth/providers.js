@@ -25,25 +25,25 @@ import {
   CODEBUDDY_CONFIG,
 } from "./constants/oauth";
 
-const BASE64_PADDING_GROUP = 4;
+const BASE64_BLOCK_SIZE = 4;
 
 /**
  * Decode JWT access token and extract a stable account identifier for display/upsert.
  * @param {string} accessToken
- * @returns {string|null}
+ * @returns {string|undefined}
  */
 function extractEmailFromAccessToken(accessToken) {
   try {
-    if (!accessToken || typeof accessToken !== "string") return null;
+    if (!accessToken || typeof accessToken !== "string") return undefined;
     const parts = accessToken.split(".");
-    if (parts.length !== 3) return null;
+    if (parts.length !== 3) return undefined;
     const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const missingPadding = (BASE64_PADDING_GROUP - (base64.length % BASE64_PADDING_GROUP)) % BASE64_PADDING_GROUP;
+    const missingPadding = (BASE64_BLOCK_SIZE - (base64.length % BASE64_BLOCK_SIZE)) % BASE64_BLOCK_SIZE;
     const padded = base64 + "=".repeat(missingPadding);
     const payload = JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
-    return payload.email || payload.preferred_username || payload.sub || null;
+    return payload.email || payload.preferred_username || payload.sub || undefined;
   } catch {
-    return null;
+    return undefined;
   }
 }
 
@@ -801,7 +801,7 @@ const PROVIDERS = {
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
         expiresIn: tokens.expires_in,
-        email: email || undefined,
+        email,
         providerSpecificData: {
           profileArn: tokens?.profile_arn || null,
           clientId: tokens._clientId,
