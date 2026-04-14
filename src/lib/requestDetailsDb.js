@@ -237,8 +237,6 @@ export async function getRequestDetails(filter = {}) {
 
   if (filter.apiKeyName) {
     records = records.filter((r) => {
-      // LOCAL_NO_API_KEY_LABEL = request came without API key header.
-      // UNKNOWN_API_KEY_LABEL = request had an API key that is no longer in db.json.
       if (!r.apiKey) return filter.apiKeyName === LOCAL_NO_API_KEY_LABEL;
       const keyName = apiKeyMap[r.apiKey];
       if (filter.apiKeyName === UNKNOWN_API_KEY_LABEL) {

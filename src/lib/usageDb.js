@@ -527,8 +527,6 @@ export async function getUsageStats(period = "all", options = {}) {
 
   if (options.apiKeyName) {
     history = history.filter((entry) => {
-      // LOCAL_NO_API_KEY_LABEL = request came without API key header.
-      // UNKNOWN_API_KEY_LABEL = request had an API key that is no longer in db.json.
       if (!entry.apiKey) return options.apiKeyName === LOCAL_NO_API_KEY_LABEL;
       const keyInfo = apiKeyMap[entry.apiKey];
       if (options.apiKeyName === UNKNOWN_API_KEY_LABEL) {

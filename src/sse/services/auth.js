@@ -252,6 +252,7 @@ export async function clearAccountError(connectionId, currentConnection, model =
 const PERIOD_MS = {
   daily: 24 * 60 * 60 * 1000,
   weekly: 7 * 24 * 60 * 60 * 1000,
+  // Monthly quota uses a rolling 30-day window.
   monthly: 30 * 24 * 60 * 60 * 1000,
 };
 
@@ -351,7 +352,7 @@ export async function authorizeApiKeyRequest(rawApiKey, context = {}) {
     const providerConnections = await getProviderConnections({ provider, isActive: true });
     const allowedInProvider = providerConnections.some((conn) => allowedConnectionIds.includes(conn.id));
     if (!allowedInProvider) {
-      return { ok: false, status: 403, error: "API key is not allowed for provider accounts of this provider" };
+      return { ok: false, status: 403, error: "API key is not allowed for any accounts of this provider" };
     }
   }
 
