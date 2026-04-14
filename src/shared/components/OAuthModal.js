@@ -152,10 +152,6 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
 
         setDeviceData(data);
 
-        // Open verification URL
-        const verifyUrl = data.verification_uri_complete || data.verification_uri;
-        if (verifyUrl) window.open(verifyUrl, "_blank");
-
         // Pass extraData for Kiro (contains _clientId, _clientSecret)
         const extraData = provider === "kiro"
           ? {
@@ -341,6 +337,7 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
   }, [onClose]);
 
   if (!provider || !providerInfo) return null;
+  const deviceLoginUrl = deviceData?.verification_uri_complete || deviceData?.verification_uri || "";
 
   return (
     <Modal isOpen={isOpen} title={`Connect ${providerInfo.name}`} onClose={handleClose} size="lg">
@@ -368,18 +365,28 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
           <>
             <div className="text-center py-4">
               <p className="text-sm text-text-muted mb-4">
-                Visit the URL below and enter the code:
+                Visit the login URL below and authorize:
               </p>
               <div className="bg-sidebar p-4 rounded-lg mb-4">
-                <p className="text-xs text-text-muted mb-1">Verification URL</p>
+                <p className="text-xs text-text-muted mb-1">Login URL</p>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 text-sm break-all">{deviceData.verification_uri}</code>
+                  <code className="flex-1 text-sm break-all">{deviceLoginUrl}</code>
                   <Button
                     size="sm"
                     variant="ghost"
-                    icon={copied === "verify_url" ? "check" : "content_copy"}
-                    onClick={() => copy(deviceData.verification_uri, "verify_url")}
+                    icon={copied === "login_url" ? "check" : "content_copy"}
+                    onClick={() => copy(deviceLoginUrl, "login_url")}
+                    disabled={!deviceLoginUrl}
                   />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon="open_in_new"
+                    onClick={() => window.open(deviceLoginUrl, "_blank", "noopener,noreferrer")}
+                    disabled={!deviceLoginUrl}
+                  >
+                    Open
+                  </Button>
                 </div>
               </div>
               <div className="bg-primary/10 p-4 rounded-lg">
