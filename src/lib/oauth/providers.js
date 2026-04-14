@@ -798,7 +798,7 @@ const PROVIDERS = {
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
         expiresIn: tokens.expires_in,
-        ...(email ? { email } : {}),
+        email: email || undefined,
         providerSpecificData: {
           profileArn: tokens?.profile_arn || null,
           clientId: tokens._clientId,
