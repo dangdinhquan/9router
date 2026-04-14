@@ -25,6 +25,11 @@ import {
   CODEBUDDY_CONFIG,
 } from "./constants/oauth";
 
+/**
+ * Decode JWT access token and extract a stable account identifier for display/upsert.
+ * @param {string} accessToken
+ * @returns {string|null}
+ */
 function extractEmailFromAccessToken(accessToken) {
   try {
     if (!accessToken || typeof accessToken !== "string") return null;

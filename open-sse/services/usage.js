@@ -660,7 +660,7 @@ async function getKiroUsage(accessToken, providerSpecificData) {
 
   if (sawAuthError && authMethod === "idc") {
     return {
-      message: "Kiro quota API is unavailable for the current AWS IAM Identity Center session. Chat may still work.",
+      message: "Kiro quota API is unavailable for the current AWS IAM Identity Center session. Chat may still work. Reconnect Kiro if this persists after renewing your IAM/IDC session.",
       quotas: {},
     };
   }
