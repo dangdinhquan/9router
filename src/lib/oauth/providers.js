@@ -653,12 +653,10 @@ const PROVIDERS = {
     flowType: "device_code",
     // Kiro uses AWS SSO OIDC - requires client registration first
     requestDeviceCode: async (config, codeChallenge, options = {}) => {
-      const region = typeof options.region === "string" && options.region.trim()
-        ? options.region.trim()
-        : "us-east-1";
-      const startUrl = typeof options.startUrl === "string" && options.startUrl.trim()
-        ? options.startUrl.trim()
-        : config.startUrl;
+      const trimmedRegion = typeof options.region === "string" ? options.region.trim() : "";
+      const region = trimmedRegion || "us-east-1";
+      const trimmedStartUrl = typeof options.startUrl === "string" ? options.startUrl.trim() : "";
+      const startUrl = trimmedStartUrl || config.startUrl;
       const authMethod = options.authMethod === "idc" ? "idc" : "builder-id";
       const registerClientUrl = `https://oidc.${region}.amazonaws.com/client/register`;
       const deviceAuthUrl = `https://oidc.${region}.amazonaws.com/device_authorization`;
