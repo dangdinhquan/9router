@@ -7,6 +7,7 @@ import Drawer from "@/shared/components/Drawer";
 import Pagination from "@/shared/components/Pagination";
 import { cn } from "@/shared/utils/cn";
 import { AI_PROVIDERS, getProviderByAlias } from "@/shared/constants/providers";
+import { LOCAL_NO_API_KEY_LABEL, UNKNOWN_API_KEY_LABEL } from "@/shared/constants/apiKeys";
 
 let providerNameCache = null;
 let providerNodesCache = null;
@@ -213,8 +214,8 @@ export default function RequestDetailsTab() {
               )}
             >
               <option value="">All API Keys</option>
-              <option value="Local (No API Key)">Local (No API Key)</option>
-              <option value="Unknown API Key">Unknown API Key</option>
+              <option value={LOCAL_NO_API_KEY_LABEL}>{LOCAL_NO_API_KEY_LABEL}</option>
+              <option value={UNKNOWN_API_KEY_LABEL}>{UNKNOWN_API_KEY_LABEL}</option>
               {apiKeys.map((key) => (
                 <option key={key.id} value={key.name}>{key.name}</option>
               ))}

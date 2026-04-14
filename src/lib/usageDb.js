@@ -5,6 +5,7 @@ import path from "path";
 import os from "os";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { LOCAL_NO_API_KEY_LABEL, UNKNOWN_API_KEY_LABEL } from "@/shared/constants/apiKeys.js";
 
 const isCloud = typeof caches !== 'undefined' || typeof caches === 'object';
 
@@ -526,14 +527,14 @@ export async function getUsageStats(period = "all", options = {}) {
 
   if (options.apiKeyName) {
     history = history.filter((entry) => {
-      // "Local (No API Key)" = request came without API key header.
-      // "Unknown API Key" = request had an API key that is no longer in db.json.
-      if (!entry.apiKey) return options.apiKeyName === "Local (No API Key)";
+      // LOCAL_NO_API_KEY_LABEL = request came without API key header.
+      // UNKNOWN_API_KEY_LABEL = request had an API key that is no longer in db.json.
+      if (!entry.apiKey) return options.apiKeyName === LOCAL_NO_API_KEY_LABEL;
       const keyInfo = apiKeyMap[entry.apiKey];
-      if (options.apiKeyName === "Unknown API Key") {
+      if (options.apiKeyName === UNKNOWN_API_KEY_LABEL) {
         return !keyInfo;
       }
-      return (keyInfo?.name || "Unknown API Key") === options.apiKeyName;
+      return (keyInfo?.name || UNKNOWN_API_KEY_LABEL) === options.apiKeyName;
     });
   }
 
@@ -749,7 +750,7 @@ export async function getUsageStats(period = "all", options = {}) {
       }
     } else {
       const apiKeyKey = "local-no-key";
-      const keyName = "Local (No API Key)";
+      const keyName = LOCAL_NO_API_KEY_LABEL;
 
       if (!stats.byApiKey[apiKeyKey]) {
         stats.byApiKey[apiKeyKey] = {

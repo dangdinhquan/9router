@@ -3,6 +3,7 @@ import { JSONFile } from "lowdb/node";
 import path from "node:path";
 import os from "node:os";
 import fs from "node:fs";
+import { LOCAL_NO_API_KEY_LABEL, UNKNOWN_API_KEY_LABEL } from "@/shared/constants/apiKeys.js";
 
 const isCloud = typeof caches !== "undefined" && typeof caches === "object";
 
@@ -236,14 +237,14 @@ export async function getRequestDetails(filter = {}) {
 
   if (filter.apiKeyName) {
     records = records.filter((r) => {
-      // "Local (No API Key)" = request came without API key header.
-      // "Unknown API Key" = request had an API key that is no longer in db.json.
-      if (!r.apiKey) return filter.apiKeyName === "Local (No API Key)";
+      // LOCAL_NO_API_KEY_LABEL = request came without API key header.
+      // UNKNOWN_API_KEY_LABEL = request had an API key that is no longer in db.json.
+      if (!r.apiKey) return filter.apiKeyName === LOCAL_NO_API_KEY_LABEL;
       const keyName = apiKeyMap[r.apiKey];
-      if (filter.apiKeyName === "Unknown API Key") {
+      if (filter.apiKeyName === UNKNOWN_API_KEY_LABEL) {
         return !keyName;
       }
-      return (keyName || "Unknown API Key") === filter.apiKeyName;
+      return (keyName || UNKNOWN_API_KEY_LABEL) === filter.apiKeyName;
     });
   }
 
@@ -264,7 +265,7 @@ export async function getRequestDetails(filter = {}) {
   const totalPages = Math.ceil(totalItems / pageSize);
   const details = records.slice((page - 1) * pageSize, page * pageSize).map((record) => ({
     ...record,
-    keyName: record.apiKey ? (apiKeyMap[record.apiKey] || "Unknown API Key") : "Local (No API Key)",
+    keyName: record.apiKey ? (apiKeyMap[record.apiKey] || UNKNOWN_API_KEY_LABEL) : LOCAL_NO_API_KEY_LABEL,
   }));
 
   return {

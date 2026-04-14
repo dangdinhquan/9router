@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { FREE_PROVIDERS } from "@/shared/constants/providers";
+import { LOCAL_NO_API_KEY_LABEL, UNKNOWN_API_KEY_LABEL } from "@/shared/constants/apiKeys";
 import Badge from "./Badge";
 import Card from "./Card";
 import OverviewCards from "@/app/(dashboard)/dashboard/usage/components/OverviewCards";
@@ -417,8 +418,8 @@ export default function UsageStats() {
           className="px-3 py-1.5 rounded-lg border border-border bg-bg-subtle text-sm font-medium text-text focus:outline-none focus:ring-2 focus:ring-primary/50"
         >
           <option value="">All API Keys</option>
-          <option value="Local (No API Key)">Local (No API Key)</option>
-          <option value="Unknown API Key">Unknown API Key</option>
+          <option value={LOCAL_NO_API_KEY_LABEL}>{LOCAL_NO_API_KEY_LABEL}</option>
+          <option value={UNKNOWN_API_KEY_LABEL}>{UNKNOWN_API_KEY_LABEL}</option>
           {apiKeys.map((key) => (
             <option key={key.id} value={key.name}>{key.name}</option>
           ))}

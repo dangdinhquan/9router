@@ -252,14 +252,10 @@ export async function clearAccountError(connectionId, currentConnection, model =
 const PERIOD_MS = {
   daily: 24 * 60 * 60 * 1000,
   weekly: 7 * 24 * 60 * 60 * 1000,
+  monthly: 30 * 24 * 60 * 60 * 1000,
 };
 
 function getQuotaCutoff(period) {
-  if (period === "monthly") {
-    const monthAgo = new Date();
-    monthAgo.setMonth(monthAgo.getMonth() - 1);
-    return monthAgo.toISOString();
-  }
   return new Date(Date.now() - PERIOD_MS[period]).toISOString();
 }
 
@@ -344,8 +340,8 @@ export async function authorizeApiKeyRequest(rawApiKey, context = {}) {
       model,
       provider && model ? `${provider}/${model}` : null,
     ].filter(Boolean);
-    const matchedModel = restrictions.models.some((allowed) => modelCandidates.includes(allowed));
-    if (!matchedModel) {
+    const isModelAllowed = restrictions.models.some((allowed) => modelCandidates.includes(allowed));
+    if (!isModelAllowed) {
       return { ok: false, status: 403, error: "API key is not allowed for this model" };
     }
   }
