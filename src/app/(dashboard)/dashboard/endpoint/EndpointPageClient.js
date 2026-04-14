@@ -1476,7 +1476,7 @@ function ProviderModelSelectionSection({ title, models, selected, onToggle }) {
       }
       return next;
     });
-  }, [groupedModels]);
+  }, [groupedModels, selectedIds]);
 
   if (!groupedModels.length) return null;
 
