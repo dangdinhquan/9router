@@ -153,7 +153,6 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       originalModel: modelStr,
     });
     if (!apiKeyAuthz.ok) {
-      log.warn("AUTH", apiKeyAuthz.error);
       return errorResponse(apiKeyAuthz.status || HTTP_STATUS.FORBIDDEN, apiKeyAuthz.error || "API key authorization failed");
     }
   }

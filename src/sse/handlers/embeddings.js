@@ -82,7 +82,6 @@ export async function handleEmbeddings(request) {
       originalModel: modelStr,
     });
     if (!apiKeyAuthz.ok) {
-      log.warn("AUTH", apiKeyAuthz.error);
       return errorResponse(apiKeyAuthz.status || HTTP_STATUS.FORBIDDEN, apiKeyAuthz.error || "API key authorization failed");
     }
   }
