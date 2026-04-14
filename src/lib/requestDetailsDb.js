@@ -226,20 +226,19 @@ export async function getRequestDetails(filter = {}) {
   let records = [...db.data.records];
   let apiKeyMap = {};
 
-  if (filter.apiKeyName) {
-    try {
-      const { getApiKeys } = await import("@/lib/localDb");
-      const allApiKeys = await getApiKeys();
-      for (const item of allApiKeys) {
-        apiKeyMap[item.key] = item.name;
-      }
-      records = records.filter((r) => {
-        if (!r.apiKey) return filter.apiKeyName === "Local (No API Key)";
-        return apiKeyMap[r.apiKey] === filter.apiKeyName;
-      });
-    } catch {
-      records = [];
+  try {
+    const { getApiKeys } = await import("@/lib/localDb");
+    const allApiKeys = await getApiKeys();
+    for (const item of allApiKeys) {
+      apiKeyMap[item.key] = item.name;
     }
+  } catch {}
+
+  if (filter.apiKeyName) {
+    records = records.filter((r) => {
+      if (!r.apiKey) return filter.apiKeyName === "Local (No API Key)";
+      return (apiKeyMap[r.apiKey] || "Unknown API Key") === filter.apiKeyName;
+    });
   }
 
   // Apply filters

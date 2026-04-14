@@ -22,6 +22,7 @@ export async function handleTts(request) {
 
   const url = new URL(request.url);
   const modelStr = body.model;
+  // Extract once because key can be validated (requireApiKey) and authorized (policy checks).
   const apiKey = extractApiKey(request);
   const responseFormat = url.searchParams.get("response_format") || "mp3"; // mp3 (default) | json
   log.request("POST", `${url.pathname} | ${modelStr} | format=${responseFormat}`);

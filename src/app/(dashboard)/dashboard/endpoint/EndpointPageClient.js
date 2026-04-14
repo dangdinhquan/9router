@@ -937,7 +937,9 @@ export default function APIPageClient({ machineId }) {
                   </p>
                   {hasKeyPolicyRestrictions(key) && (
                     <p className="text-xs text-text-muted mt-1">
-                      Policy: {key.policy?.quota?.metric ? `${key.policy.quota.metric}/${key.policy.quota.period}` : "no quota"}
+                      Policy: {(key.policy?.quota?.metric && key.policy?.quota?.limit)
+                        ? `${key.policy.quota.metric}/${key.policy.quota.period}`
+                        : "no quota"}
                       {` • providers ${key.policy?.restrictions?.providers?.length || 0}`}
                       {` • accounts ${key.policy?.restrictions?.connectionIds?.length || 0}`}
                       {` • models ${key.policy?.restrictions?.models?.length || 0}`}

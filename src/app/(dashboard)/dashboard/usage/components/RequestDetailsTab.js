@@ -214,6 +214,7 @@ export default function RequestDetailsTab() {
             >
               <option value="">All API Keys</option>
               <option value="Local (No API Key)">Local (No API Key)</option>
+              <option value="Unknown API Key">Unknown API Key</option>
               {apiKeys.map((key) => (
                 <option key={key.id} value={key.name}>{key.name}</option>
               ))}
