@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import PropTypes from "prop-types";
 import { Card, Button, Input, Modal, CardSkeleton, Toggle } from "@/shared/components";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
@@ -988,6 +988,7 @@ export default function APIPageClient({ machineId }) {
       <Modal
         isOpen={showAddModal}
         title="Create API Key"
+        size="full"
         onClose={() => {
           setShowAddModal(false);
           setNewKeyName("");
@@ -1071,9 +1072,9 @@ export default function APIPageClient({ machineId }) {
               },
             }))}
           />
-          <PolicySelectionSection
+          <ProviderModelSelectionSection
             title="Allowed Models (empty = all)"
-            items={availableModels.map((m) => ({ id: m.fullModel, label: m.alias || m.fullModel }))}
+            models={availableModels}
             selected={newKeyPolicy.restrictions.models}
             onToggle={(modelId) => setNewKeyPolicy((prev) => ({
               ...prev,
@@ -1106,6 +1107,7 @@ export default function APIPageClient({ machineId }) {
       <Modal
         isOpen={showEditKeyModal}
         title="Edit API Key Policy"
+        size="full"
         onClose={() => {
           setShowEditKeyModal(false);
           setEditingKey(null);
@@ -1188,9 +1190,9 @@ export default function APIPageClient({ machineId }) {
               },
             }))}
           />
-          <PolicySelectionSection
+          <ProviderModelSelectionSection
             title="Allowed Models (empty = all)"
-            items={availableModels.map((m) => ({ id: m.fullModel, label: m.alias || m.fullModel }))}
+            models={availableModels}
             selected={editKeyPolicy.restrictions.models}
             onToggle={(modelId) => setEditKeyPolicy((prev) => ({
               ...prev,
@@ -1432,6 +1434,98 @@ function PolicySelectionSection({ title, items, selected, onToggle }) {
             <span>{item.label}</span>
           </label>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function ProviderModelSelectionSection({ title, models, selected, onToggle }) {
+  const selectedIds = Array.isArray(selected) ? selected : [];
+  const groupedModels = useMemo(() => {
+    const groups = {};
+    for (const model of (models || [])) {
+      const provider = model.provider || (typeof model.fullModel === "string" ? model.fullModel.split("/")[0] : "unknown");
+      if (!groups[provider]) groups[provider] = [];
+      groups[provider].push(model);
+    }
+
+    return Object.entries(groups)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([provider, providerModels]) => ({
+        provider,
+        models: providerModels.sort((m1, m2) => (m1.alias || m1.fullModel || "").localeCompare(m2.alias || m2.fullModel || "")),
+      }));
+  }, [models]);
+
+  const [expandedProviders, setExpandedProviders] = useState(() => {
+    const initial = {};
+    for (const group of groupedModels) initial[group.provider] = false;
+    return initial;
+  });
+
+  useEffect(() => {
+    setExpandedProviders((prev) => {
+      const next = { ...prev };
+      for (const group of groupedModels) {
+        if (next[group.provider] === undefined) next[group.provider] = false;
+      }
+      for (const key of Object.keys(next)) {
+        if (!groupedModels.some((g) => g.provider === key)) delete next[key];
+      }
+      return next;
+    });
+  }, [groupedModels]);
+
+  if (!groupedModels.length) return null;
+
+  return (
+    <div>
+      <p className="text-sm font-medium mb-2">{title}</p>
+      <div className="max-h-64 overflow-y-auto rounded-lg border border-border p-2 space-y-2">
+        {groupedModels.map((group) => {
+          const providerSelectedCount = group.models.reduce((count, model) => {
+            return count + (selectedIds.includes(model.fullModel) ? 1 : 0);
+          }, 0);
+          const isExpanded = !!expandedProviders[group.provider];
+
+          return (
+            <div key={group.provider} className="rounded-lg border border-black/10 dark:border-white/10 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setExpandedProviders((prev) => ({ ...prev, [group.provider]: !prev[group.provider] }))}
+                className="w-full flex items-center justify-between px-3 py-2 bg-black/[0.02] dark:bg-white/[0.02] hover:bg-black/[0.04] dark:hover:bg-white/[0.04]"
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`material-symbols-outlined text-[18px] text-text-muted transition-transform ${isExpanded ? "rotate-90" : ""}`}>
+                    chevron_right
+                  </span>
+                  <span className="font-medium text-sm text-text-main">{group.provider}</span>
+                </div>
+                <span className="text-xs text-text-muted">
+                  {providerSelectedCount}/{group.models.length} selected
+                </span>
+              </button>
+              {isExpanded && (
+                <div className="p-2 space-y-1 border-t border-black/10 dark:border-white/10">
+                  {group.models.map((model) => (
+                    <label key={model.fullModel} className="flex items-start gap-2 text-sm text-text-main px-1 py-1 rounded hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(model.fullModel)}
+                        onChange={() => onToggle(model.fullModel)}
+                        className="mt-0.5"
+                      />
+                      <span className="flex flex-col leading-tight">
+                        <span>{model.alias || model.fullModel}</span>
+                        <span className="text-xs text-text-muted font-mono">{model.fullModel}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
