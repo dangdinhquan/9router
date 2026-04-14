@@ -467,8 +467,9 @@ const PERIOD_MS = { "24h": 86400000, "7d": 604800000, "30d": 2592000000, "60d": 
 /**
  * Get aggregated usage stats
  * @param {"24h"|"7d"|"30d"|"60d"|"all"} period - Time period to filter
+ * @param {object} options - Extra filters
  */
-export async function getUsageStats(period = "all") {
+export async function getUsageStats(period = "all", options = {}) {
   const db = await getUsageDb();
   let history = db.data.history || [];
 
@@ -521,6 +522,14 @@ export async function getUsageStats(period = "all") {
       id: key.id,
       createdAt: key.createdAt
     };
+  }
+
+  if (options.apiKeyName) {
+    history = history.filter((entry) => {
+      if (!entry.apiKey) return options.apiKeyName === "Local (No API Key)";
+      const keyInfo = apiKeyMap[entry.apiKey];
+      return keyInfo?.name === options.apiKeyName;
+    });
   }
 
   // 20 most recent requests from history (always in sync with SSE emit)

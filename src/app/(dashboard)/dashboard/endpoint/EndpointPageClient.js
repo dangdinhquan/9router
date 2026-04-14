@@ -14,12 +14,50 @@ const TUNNEL_BENEFITS = [
 
 const TUNNEL_PING_INTERVAL_MS = 2000;
 const TUNNEL_PING_MAX_MS = 300000;
+
+const EMPTY_POLICY = {
+  quota: {
+    metric: null,
+    period: "daily",
+    limit: null,
+  },
+  restrictions: {
+    providers: [],
+    connectionIds: [],
+    models: [],
+  },
+};
+
+function normalizePolicy(policy) {
+  const quota = policy?.quota || {};
+  const restrictions = policy?.restrictions || {};
+  return {
+    quota: {
+      metric: quota.metric === "cost" || quota.metric === "tokens" ? quota.metric : null,
+      period: ["daily", "weekly", "monthly"].includes(quota.period) ? quota.period : "daily",
+      limit: Number.isFinite(Number(quota.limit)) && Number(quota.limit) > 0 ? Number(quota.limit) : null,
+    },
+    restrictions: {
+      providers: Array.isArray(restrictions.providers) ? restrictions.providers : [],
+      connectionIds: Array.isArray(restrictions.connectionIds) ? restrictions.connectionIds : [],
+      models: Array.isArray(restrictions.models) ? restrictions.models : [],
+    },
+  };
+}
+
 export default function APIPageClient({ machineId }) {
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [createdKey, setCreatedKey] = useState(null);
+  const [newKeyPolicy, setNewKeyPolicy] = useState(EMPTY_POLICY);
+  const [showEditKeyModal, setShowEditKeyModal] = useState(false);
+  const [editingKey, setEditingKey] = useState(null);
+  const [editKeyName, setEditKeyName] = useState("");
+  const [editKeyPolicy, setEditKeyPolicy] = useState(EMPTY_POLICY);
+  const [providerConnections, setProviderConnections] = useState([]);
+  const [availableModels, setAvailableModels] = useState([]);
 
   const [requireApiKey, setRequireApiKey] = useState(false);
   const [requireLogin, setRequireLogin] = useState(true);
@@ -169,11 +207,20 @@ export default function APIPageClient({ machineId }) {
 
   const fetchData = async () => {
     try {
-      const keysRes = await fetch("/api/keys");
-      const keysData = await keysRes.json();
-      if (keysRes.ok) {
-        setKeys(keysData.keys || []);
-      }
+      const [keysRes, providersRes, modelsRes] = await Promise.all([
+        fetch("/api/keys"),
+        fetch("/api/providers"),
+        fetch("/api/models"),
+      ]);
+      const [keysData, providersData, modelsData] = await Promise.all([
+        keysRes.json(),
+        providersRes.json(),
+        modelsRes.json(),
+      ]);
+
+      if (keysRes.ok) setKeys(keysData.keys || []);
+      if (providersRes.ok) setProviderConnections(providersData.connections || []);
+      if (modelsRes.ok) setAvailableModels(modelsData.models || []);
     } catch (error) {
       console.log("Error fetching data:", error);
     } finally {
@@ -504,7 +551,7 @@ export default function APIPageClient({ machineId }) {
       const res = await fetch("/api/keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newKeyName }),
+        body: JSON.stringify({ name: newKeyName, policy: newKeyPolicy }),
       });
       const data = await res.json();
 
@@ -512,6 +559,7 @@ export default function APIPageClient({ machineId }) {
         setCreatedKey(data.key);
         await fetchData();
         setNewKeyName("");
+        setNewKeyPolicy(EMPTY_POLICY);
         setShowAddModal(false);
       }
     } catch (error) {
@@ -550,6 +598,41 @@ export default function APIPageClient({ machineId }) {
       }
     } catch (error) {
       console.log("Error toggling key:", error);
+    }
+  };
+
+  const toggleSelection = (values, value) => {
+    const set = new Set(values || []);
+    if (set.has(value)) set.delete(value);
+    else set.add(value);
+    return [...set];
+  };
+
+  const handleOpenEditKey = (key) => {
+    setEditingKey(key);
+    setEditKeyName(key.name || "");
+    setEditKeyPolicy(normalizePolicy(key.policy || EMPTY_POLICY));
+    setShowEditKeyModal(true);
+  };
+
+  const handleSaveKeyPolicy = async () => {
+    if (!editingKey || !editKeyName.trim()) return;
+    try {
+      const res = await fetch(`/api/keys/${editingKey.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editKeyName.trim(),
+          policy: editKeyPolicy,
+        }),
+      });
+      if (res.ok) {
+        await fetchData();
+        setShowEditKeyModal(false);
+        setEditingKey(null);
+      }
+    } catch (error) {
+      console.log("Error updating key policy:", error);
     }
   };
 
@@ -842,11 +925,26 @@ export default function APIPageClient({ machineId }) {
                   <p className="text-xs text-text-muted mt-1">
                     Created {new Date(key.createdAt).toLocaleDateString()}
                   </p>
+                  {(key.policy?.quota?.metric || (key.policy?.restrictions?.providers?.length || 0) > 0 || (key.policy?.restrictions?.connectionIds?.length || 0) > 0 || (key.policy?.restrictions?.models?.length || 0) > 0) && (
+                    <p className="text-xs text-text-muted mt-1">
+                      Policy: {key.policy?.quota?.metric ? `${key.policy.quota.metric}/${key.policy.quota.period}` : "no quota"}
+                      {` • providers ${key.policy?.restrictions?.providers?.length || 0}`}
+                      {` • accounts ${key.policy?.restrictions?.connectionIds?.length || 0}`}
+                      {` • models ${key.policy?.restrictions?.models?.length || 0}`}
+                    </p>
+                  )}
                   {key.isActive === false && (
                     <p className="text-xs text-orange-500 mt-1">Paused</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleOpenEditKey(key)}
+                    className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded text-text-muted hover:text-primary opacity-0 group-hover:opacity-100 transition-all"
+                    title="Edit policy"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">tune</span>
+                  </button>
                   <Toggle
                     size="sm"
                     checked={key.isActive ?? true}
@@ -881,6 +979,7 @@ export default function APIPageClient({ machineId }) {
         onClose={() => {
           setShowAddModal(false);
           setNewKeyName("");
+          setNewKeyPolicy(EMPTY_POLICY);
         }}
       >
         <div className="flex flex-col gap-4">
@@ -890,6 +989,88 @@ export default function APIPageClient({ machineId }) {
             onChange={(e) => setNewKeyName(e.target.value)}
             placeholder="Production Key"
           />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <p className="text-sm font-medium mb-1">Quota Metric</p>
+              <select
+                value={newKeyPolicy.quota.metric || ""}
+                onChange={(e) => setNewKeyPolicy((prev) => ({
+                  ...prev,
+                  quota: { ...prev.quota, metric: e.target.value || null },
+                }))}
+                className="w-full h-9 px-3 rounded-lg border border-border bg-bg-subtle text-sm"
+              >
+                <option value="">No Limit</option>
+                <option value="cost">Cost ($)</option>
+                <option value="tokens">Tokens</option>
+              </select>
+            </div>
+            <div>
+              <p className="text-sm font-medium mb-1">Period</p>
+              <select
+                value={newKeyPolicy.quota.period}
+                onChange={(e) => setNewKeyPolicy((prev) => ({
+                  ...prev,
+                  quota: { ...prev.quota, period: e.target.value },
+                }))}
+                className="w-full h-9 px-3 rounded-lg border border-border bg-bg-subtle text-sm"
+                disabled={!newKeyPolicy.quota.metric}
+              >
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+            <Input
+              label="Limit"
+              type="number"
+              min="0"
+              step="any"
+              value={newKeyPolicy.quota.limit ?? ""}
+              onChange={(e) => setNewKeyPolicy((prev) => ({
+                ...prev,
+                quota: { ...prev.quota, limit: e.target.value === "" ? null : Number(e.target.value) },
+              }))}
+              disabled={!newKeyPolicy.quota.metric}
+              placeholder={newKeyPolicy.quota.metric === "cost" ? "e.g. 5" : "e.g. 100000"}
+            />
+          </div>
+          <PolicySelectionSection
+            title="Allowed Providers (empty = all)"
+            items={Array.from(new Set(providerConnections.map((c) => c.provider))).map((provider) => ({ id: provider, label: provider }))}
+            selected={newKeyPolicy.restrictions.providers}
+            onToggle={(provider) => setNewKeyPolicy((prev) => ({
+              ...prev,
+              restrictions: {
+                ...prev.restrictions,
+                providers: toggleSelection(prev.restrictions.providers, provider),
+              },
+            }))}
+          />
+          <PolicySelectionSection
+            title="Allowed Provider Accounts (empty = all)"
+            items={providerConnections.map((conn) => ({ id: conn.id, label: `${conn.name || conn.email || conn.id} (${conn.provider})` }))}
+            selected={newKeyPolicy.restrictions.connectionIds}
+            onToggle={(connectionId) => setNewKeyPolicy((prev) => ({
+              ...prev,
+              restrictions: {
+                ...prev.restrictions,
+                connectionIds: toggleSelection(prev.restrictions.connectionIds, connectionId),
+              },
+            }))}
+          />
+          <PolicySelectionSection
+            title="Allowed Models (empty = all)"
+            items={availableModels.map((m) => ({ id: m.fullModel, label: m.alias || m.fullModel }))}
+            selected={newKeyPolicy.restrictions.models}
+            onToggle={(modelId) => setNewKeyPolicy((prev) => ({
+              ...prev,
+              restrictions: {
+                ...prev.restrictions,
+                models: toggleSelection(prev.restrictions.models, modelId),
+              },
+            }))}
+          />
           <div className="flex gap-2">
             <Button onClick={handleCreateKey} fullWidth disabled={!newKeyName.trim()}>
               Create
@@ -898,6 +1079,123 @@ export default function APIPageClient({ machineId }) {
               onClick={() => {
                 setShowAddModal(false);
                 setNewKeyName("");
+                setNewKeyPolicy(EMPTY_POLICY);
+              }}
+              variant="ghost"
+              fullWidth
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit Key Policy Modal */}
+      <Modal
+        isOpen={showEditKeyModal}
+        title="Edit API Key Policy"
+        onClose={() => {
+          setShowEditKeyModal(false);
+          setEditingKey(null);
+        }}
+      >
+        <div className="flex flex-col gap-4">
+          <Input
+            label="Key Name"
+            value={editKeyName}
+            onChange={(e) => setEditKeyName(e.target.value)}
+            placeholder="Production Key"
+          />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <p className="text-sm font-medium mb-1">Quota Metric</p>
+              <select
+                value={editKeyPolicy.quota.metric || ""}
+                onChange={(e) => setEditKeyPolicy((prev) => ({
+                  ...prev,
+                  quota: { ...prev.quota, metric: e.target.value || null },
+                }))}
+                className="w-full h-9 px-3 rounded-lg border border-border bg-bg-subtle text-sm"
+              >
+                <option value="">No Limit</option>
+                <option value="cost">Cost ($)</option>
+                <option value="tokens">Tokens</option>
+              </select>
+            </div>
+            <div>
+              <p className="text-sm font-medium mb-1">Period</p>
+              <select
+                value={editKeyPolicy.quota.period}
+                onChange={(e) => setEditKeyPolicy((prev) => ({
+                  ...prev,
+                  quota: { ...prev.quota, period: e.target.value },
+                }))}
+                className="w-full h-9 px-3 rounded-lg border border-border bg-bg-subtle text-sm"
+                disabled={!editKeyPolicy.quota.metric}
+              >
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+            <Input
+              label="Limit"
+              type="number"
+              min="0"
+              step="any"
+              value={editKeyPolicy.quota.limit ?? ""}
+              onChange={(e) => setEditKeyPolicy((prev) => ({
+                ...prev,
+                quota: { ...prev.quota, limit: e.target.value === "" ? null : Number(e.target.value) },
+              }))}
+              disabled={!editKeyPolicy.quota.metric}
+              placeholder={editKeyPolicy.quota.metric === "cost" ? "e.g. 5" : "e.g. 100000"}
+            />
+          </div>
+          <PolicySelectionSection
+            title="Allowed Providers (empty = all)"
+            items={Array.from(new Set(providerConnections.map((c) => c.provider))).map((provider) => ({ id: provider, label: provider }))}
+            selected={editKeyPolicy.restrictions.providers}
+            onToggle={(provider) => setEditKeyPolicy((prev) => ({
+              ...prev,
+              restrictions: {
+                ...prev.restrictions,
+                providers: toggleSelection(prev.restrictions.providers, provider),
+              },
+            }))}
+          />
+          <PolicySelectionSection
+            title="Allowed Provider Accounts (empty = all)"
+            items={providerConnections.map((conn) => ({ id: conn.id, label: `${conn.name || conn.email || conn.id} (${conn.provider})` }))}
+            selected={editKeyPolicy.restrictions.connectionIds}
+            onToggle={(connectionId) => setEditKeyPolicy((prev) => ({
+              ...prev,
+              restrictions: {
+                ...prev.restrictions,
+                connectionIds: toggleSelection(prev.restrictions.connectionIds, connectionId),
+              },
+            }))}
+          />
+          <PolicySelectionSection
+            title="Allowed Models (empty = all)"
+            items={availableModels.map((m) => ({ id: m.fullModel, label: m.alias || m.fullModel }))}
+            selected={editKeyPolicy.restrictions.models}
+            onToggle={(modelId) => setEditKeyPolicy((prev) => ({
+              ...prev,
+              restrictions: {
+                ...prev.restrictions,
+                models: toggleSelection(prev.restrictions.models, modelId),
+              },
+            }))}
+          />
+          <div className="flex gap-2">
+            <Button onClick={handleSaveKeyPolicy} fullWidth disabled={!editKeyName.trim()}>
+              Save
+            </Button>
+            <Button
+              onClick={() => {
+                setShowEditKeyModal(false);
+                setEditingKey(null);
               }}
               variant="ghost"
               fullWidth
@@ -1101,6 +1399,28 @@ export default function APIPageClient({ machineId }) {
           </div>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+function PolicySelectionSection({ title, items, selected, onToggle }) {
+  if (!items?.length) return null;
+  const selectedIds = Array.isArray(selected) ? selected : [];
+  return (
+    <div>
+      <p className="text-sm font-medium mb-2">{title}</p>
+      <div className="max-h-28 overflow-y-auto rounded-lg border border-border p-2 space-y-1">
+        {items.map((item) => (
+          <label key={item.id} className="flex items-center gap-2 text-sm text-text-main">
+            <input
+              type="checkbox"
+              checked={selectedIds.includes(item.id)}
+              onChange={() => onToggle(item.id)}
+            />
+            <span>{item.label}</span>
+          </label>
+        ))}
+      </div>
     </div>
   );
 }

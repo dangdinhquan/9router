@@ -148,6 +148,7 @@ async function flushToDatabase() {
         provider: item.provider || null,
         model: item.model || null,
         connectionId: item.connectionId || null,
+        apiKey: item.apiKey || null,
         timestamp: item.timestamp,
         status: item.status || null,
         latency: item.latency || {},
@@ -223,6 +224,23 @@ export async function getRequestDetails(filter = {}) {
 
   const db = await getDb();
   let records = [...db.data.records];
+  let apiKeyMap = {};
+
+  if (filter.apiKeyName) {
+    try {
+      const { getApiKeys } = await import("@/lib/localDb");
+      const allApiKeys = await getApiKeys();
+      for (const item of allApiKeys) {
+        apiKeyMap[item.key] = item.name;
+      }
+      records = records.filter((r) => {
+        if (!r.apiKey) return filter.apiKeyName === "Local (No API Key)";
+        return apiKeyMap[r.apiKey] === filter.apiKeyName;
+      });
+    } catch {
+      records = [];
+    }
+  }
 
   // Apply filters
   if (filter.provider) records = records.filter(r => r.provider === filter.provider);
@@ -239,7 +257,10 @@ export async function getRequestDetails(filter = {}) {
   const page = filter.page || 1;
   const pageSize = filter.pageSize || 50;
   const totalPages = Math.ceil(totalItems / pageSize);
-  const details = records.slice((page - 1) * pageSize, page * pageSize);
+  const details = records.slice((page - 1) * pageSize, page * pageSize).map((record) => ({
+    ...record,
+    keyName: record.apiKey ? (apiKeyMap[record.apiKey] || `${record.apiKey.slice(0, 8)}...`) : "Local (No API Key)",
+  }));
 
   return {
     details,
