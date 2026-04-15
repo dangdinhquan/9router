@@ -622,6 +622,13 @@ export async function getUsageStats(period = "all", options = {}) {
     errorProvider: (Date.now() - lastErrorProvider.ts < 10000) ? lastErrorProvider.provider : "",
   };
 
+  const addConnectionProviderRequests = (connectionId, requestCount) => {
+    const connectionProvider = connectionProviderMap[connectionId];
+    if (!connectionProvider) return;
+    if (!stats.byConnectionProvider[connectionProvider]) stats.byConnectionProvider[connectionProvider] = { requests: 0 };
+    stats.byConnectionProvider[connectionProvider].requests += requestCount;
+  };
+
   // Active requests from pending
   for (const [connectionId, models] of Object.entries(pendingRequests.byAccount)) {
     for (const [modelKey, count] of Object.entries(models)) {
@@ -712,11 +719,7 @@ export async function getUsageStats(period = "all", options = {}) {
       // Merge byAccount
       for (const [connId, aData] of Object.entries(day.byAccount || {})) {
         const accountName = connectionMap[connId] || `Account ${connId.slice(0, 8)}...`;
-        const connectionProvider = connectionProviderMap[connId];
-        if (connectionProvider) {
-          if (!stats.byConnectionProvider[connectionProvider]) stats.byConnectionProvider[connectionProvider] = { requests: 0 };
-          stats.byConnectionProvider[connectionProvider].requests += aData.requests || 0;
-        }
+        addConnectionProviderRequests(connId, aData.requests || 0);
         const rawModel = aData.rawModel || "";
         const provider = aData.provider || "";
         const providerDisplayName = providerNodeNameMap[provider] || provider;
@@ -802,11 +805,7 @@ export async function getUsageStats(period = "all", options = {}) {
       // byAccount
       if (entry.connectionId) {
         const accountName = connectionMap[entry.connectionId] || `Account ${entry.connectionId.slice(0, 8)}...`;
-        const connectionProvider = connectionProviderMap[entry.connectionId];
-        if (connectionProvider) {
-          if (!stats.byConnectionProvider[connectionProvider]) stats.byConnectionProvider[connectionProvider] = { requests: 0 };
-          stats.byConnectionProvider[connectionProvider].requests++;
-        }
+        addConnectionProviderRequests(entry.connectionId, 1);
         const accountKey = `${entry.model} (${entry.provider} - ${accountName})`;
         if (!stats.byAccount[accountKey]) {
           stats.byAccount[accountKey] = { requests: 0, promptTokens: 0, completionTokens: 0, cost: 0, rawModel: entry.model, provider: providerDisplayName, connectionId: entry.connectionId, accountName, lastUsed: entry.timestamp };
