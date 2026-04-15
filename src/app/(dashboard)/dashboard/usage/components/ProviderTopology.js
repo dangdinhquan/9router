@@ -97,6 +97,10 @@ RouterNode.propTypes = {
 };
 
 const nodeTypes = { provider: ProviderNode, router: RouterNode };
+const EDGE_MIN_STROKE_WIDTH = 1;
+const EDGE_MAX_STROKE_EXTRA = 4;
+const EDGE_MIN_OPACITY = 0.2;
+const EDGE_OPACITY_RANGE = 0.7;
 
 // Place N nodes evenly along an ellipse around the router center.
 function getProviderRequestCount(provider, providerRequestCounts = {}) {
@@ -136,11 +140,6 @@ function buildLayout(providers, activeSet, lastSet, errorSet, providerRequestCou
   });
 
   const maxRequests = Math.max(1, ...providers.map((p) => getProviderRequestCount(p.provider, providerRequestCounts)));
-
-  const EDGE_MIN_STROKE_WIDTH = 1;
-  const EDGE_MAX_STROKE_EXTRA = 4;
-  const EDGE_MIN_OPACITY = 0.2;
-  const EDGE_OPACITY_RANGE = 0.7;
 
   const edgeStyle = (active, last, error, color, requestCount) => {
     const normalized = Math.max(0, Math.min(1, requestCount / maxRequests));
