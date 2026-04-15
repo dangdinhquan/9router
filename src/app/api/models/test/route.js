@@ -5,7 +5,9 @@ async function fetchWithBaseUrlFallback(request, endpoint, options) {
   const reqUrl = new URL(request.url);
   const requestBaseUrl = `${reqUrl.protocol}//${reqUrl.host}`;
   const fallbackBaseUrl = process.env.BASE_URL;
-  const candidates = [...new Set([requestBaseUrl, fallbackBaseUrl].filter(Boolean))];
+  const candidates = requestBaseUrl === fallbackBaseUrl
+    ? [requestBaseUrl]
+    : [requestBaseUrl, fallbackBaseUrl].filter(Boolean);
 
   let lastError = null;
   for (const baseUrl of candidates) {

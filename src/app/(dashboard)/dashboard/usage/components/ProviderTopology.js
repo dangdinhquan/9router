@@ -100,12 +100,8 @@ const nodeTypes = { provider: ProviderNode, router: RouterNode };
 
 // Place N nodes evenly along an ellipse around the router center.
 function getProviderRequestCount(provider, providerRequestCounts = {}) {
-  if (!provider) return 0;
-  return Number(
-    providerRequestCounts[provider]
-    ?? providerRequestCounts[provider.toLowerCase?.() || provider]
-    ?? 0
-  ) || 0;
+  if (typeof provider !== "string" || !provider) return 0;
+  return Number(providerRequestCounts[provider.toLowerCase()] ?? 0) || 0;
 }
 
 function buildLayout(providers, activeSet, lastSet, errorSet, providerRequestCounts = {}) {
@@ -141,10 +137,15 @@ function buildLayout(providers, activeSet, lastSet, errorSet, providerRequestCou
 
   const maxRequests = Math.max(1, ...providers.map((p) => getProviderRequestCount(p.provider, providerRequestCounts)));
 
+  const EDGE_MIN_STROKE_WIDTH = 1;
+  const EDGE_MAX_STROKE_EXTRA = 4;
+  const EDGE_MIN_OPACITY = 0.2;
+  const EDGE_OPACITY_RANGE = 0.7;
+
   const edgeStyle = (active, last, error, color, requestCount) => {
     const normalized = Math.max(0, Math.min(1, requestCount / maxRequests));
-    const baseStrokeWidth = 1 + (normalized * 4);
-    const baseOpacity = 0.2 + (normalized * 0.7);
+    const baseStrokeWidth = EDGE_MIN_STROKE_WIDTH + (normalized * EDGE_MAX_STROKE_EXTRA);
+    const baseOpacity = EDGE_MIN_OPACITY + (normalized * EDGE_OPACITY_RANGE);
 
     if (error) return { stroke: "#ef4444", strokeWidth: 2.5, opacity: 0.9 };
     if (active) return { stroke: "#22c55e", strokeWidth: 2.5, opacity: 0.9 };

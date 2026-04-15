@@ -404,8 +404,7 @@ export default function UsageStats() {
     const byProvider = stats?.byProvider || {};
     return Object.entries(byProvider).reduce((acc, [provider, usage]) => {
       if (!provider) return acc;
-      acc[provider] = usage?.requests || 0;
-      acc[provider.toLowerCase()] = usage?.requests || 0;
+      acc[String(provider).toLowerCase()] = usage?.requests || 0;
       return acc;
     }, {});
   }, [stats?.byProvider]);
