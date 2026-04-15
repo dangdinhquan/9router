@@ -401,13 +401,13 @@ export default function UsageStats() {
   }, [stats, tableView, sortBy, sortOrder]);
 
   const providerRequestCounts = useMemo(() => {
-    const byProvider = stats?.byProvider || {};
+    const byProvider = stats?.byConnectionProvider || stats?.byProvider || {};
     return Object.entries(byProvider).reduce((acc, [provider, usage]) => {
       if (!provider) return acc;
       acc[String(provider).toLowerCase()] = usage?.requests || 0;
       return acc;
     }, {});
-  }, [stats?.byProvider]);
+  }, [stats?.byConnectionProvider, stats?.byProvider]);
 
   if (!stats && !loading) return <div className="text-text-muted">Failed to load usage statistics.</div>;
 

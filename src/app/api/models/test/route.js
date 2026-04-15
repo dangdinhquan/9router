@@ -19,7 +19,7 @@ async function fetchWithBaseUrlFallback(request, endpoint, options) {
   }
 
   const reason = lastError?.message || "unknown error";
-  throw new Error(`Failed to connect to internal API (tried: ${candidates.join(", ")}): ${reason}`);
+  throw new Error(`Failed to connect to internal API endpoint ${endpoint} (tried: ${candidates.join(", ")}): ${reason}`);
 }
 
 // POST /api/models/test - Ping a single model via internal completions or embeddings
