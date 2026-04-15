@@ -151,7 +151,7 @@ function buildLayout(providers, activeSet, lastSet, errorSet, providerRequestCou
     if (active) return { stroke: "#22c55e", strokeWidth: 2.5, opacity: 0.9 };
     if (last) return { stroke: "#f59e0b", strokeWidth: Math.max(2, baseStrokeWidth), opacity: Math.max(0.7, baseOpacity) };
     if (requestCount > 0) return { stroke: color || "var(--color-border)", strokeWidth: baseStrokeWidth, opacity: baseOpacity };
-    return { stroke: "var(--color-border)", strokeWidth: 1, opacity: 0.2 };
+    return { stroke: "var(--color-border)", strokeWidth: EDGE_MIN_STROKE_WIDTH, opacity: EDGE_MIN_OPACITY };
   };
 
   providers.forEach((p, i) => {
