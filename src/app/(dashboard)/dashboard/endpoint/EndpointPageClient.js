@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import PropTypes from "prop-types";
 import { Card, Button, Input, Modal, CardSkeleton, Toggle } from "@/shared/components";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
-import { getProviderByAlias } from "@/shared/constants/providers";
+import { getProviderAlias, getProviderByAlias, resolveProviderId } from "@/shared/constants/providers";
 
 const TUNNEL_BENEFITS = [
   { icon: "public", title: "Access Anywhere", desc: "Use your API from any network" },
@@ -1111,20 +1111,21 @@ export default function APIPageClient({ machineId }) {
               }
             }}
           />
-          <ProviderModelSelectionSection
-            title="Allowed Models"
-            models={availableModels}
-            providerConnections={providerConnections}
-            selected={newKeyPolicy.restrictions.models}
-            enabled={newModelRestrictionMode === "restricted"}
-            onToggle={(modelId) => setNewKeyPolicy((prev) => ({
-              ...prev,
-              restrictions: {
-                ...prev.restrictions,
-                models: toggleSelection(prev.restrictions.models, modelId),
-              },
-            }))}
-          />
+          {newModelRestrictionMode === "restricted" && (
+            <ProviderModelSelectionSection
+              title="Allowed Models"
+              models={availableModels}
+              providerConnections={providerConnections}
+              selected={newKeyPolicy.restrictions.models}
+              onToggle={(modelId) => setNewKeyPolicy((prev) => ({
+                ...prev,
+                restrictions: {
+                  ...prev.restrictions,
+                  models: toggleSelection(prev.restrictions.models, modelId),
+                },
+              }))}
+            />
+          )}
           <div className="flex gap-2">
             <Button onClick={handleCreateKey} fullWidth disabled={!newKeyName.trim()}>
               Create
@@ -1257,20 +1258,21 @@ export default function APIPageClient({ machineId }) {
               }
             }}
           />
-          <ProviderModelSelectionSection
-            title="Allowed Models"
-            models={availableModels}
-            providerConnections={providerConnections}
-            selected={editKeyPolicy.restrictions.models}
-            enabled={editModelRestrictionMode === "restricted"}
-            onToggle={(modelId) => setEditKeyPolicy((prev) => ({
-              ...prev,
-              restrictions: {
-                ...prev.restrictions,
-                models: toggleSelection(prev.restrictions.models, modelId),
-              },
-            }))}
-          />
+          {editModelRestrictionMode === "restricted" && (
+            <ProviderModelSelectionSection
+              title="Allowed Models"
+              models={availableModels}
+              providerConnections={providerConnections}
+              selected={editKeyPolicy.restrictions.models}
+              onToggle={(modelId) => setEditKeyPolicy((prev) => ({
+                ...prev,
+                restrictions: {
+                  ...prev.restrictions,
+                  models: toggleSelection(prev.restrictions.models, modelId),
+                },
+              }))}
+            />
+          )}
           <div className="flex gap-2">
             <Button onClick={handleSaveKeyPolicy} fullWidth disabled={!editKeyName.trim()}>
               Save
@@ -1536,17 +1538,18 @@ function ModelRestrictionModeSection({ mode, onChange }) {
   );
 }
 
-function ProviderModelSelectionSection({ title, models, providerConnections, selected, onToggle, enabled = true }) {
+function ProviderModelSelectionSection({ title, models, providerConnections, selected, onToggle }) {
   const selectedIds = Array.isArray(selected) ? selected : [];
-  const connectedProviders = useMemo(
-    () => new Set((providerConnections || []).map((c) => c.provider).filter(Boolean)),
+  const connectedProviderIds = useMemo(
+    () => new Set((providerConnections || []).map((c) => resolveProviderId(c.provider)).filter(Boolean)),
     [providerConnections]
   );
   const connectionNameByProvider = useMemo(() => {
     const map = {};
     for (const conn of (providerConnections || [])) {
-      if (!conn?.provider || map[conn.provider]) continue;
-      map[conn.provider] = conn.name || conn.provider;
+      const providerId = resolveProviderId(conn?.provider);
+      if (!providerId || map[providerId]) continue;
+      map[providerId] = conn.name || providerId;
     }
     return map;
   }, [providerConnections]);
@@ -1557,10 +1560,11 @@ function ProviderModelSelectionSection({ title, models, providerConnections, sel
       const fullModel = typeof model.fullModel === "string" ? model.fullModel : "";
       const parts = fullModel.split("/");
       const parsedProvider = parts.length === 2 && parts[0] && parts[1] ? parts[0] : null;
-      const provider = model.provider || parsedProvider || "unknown";
-      if (!connectedProviders.has(provider)) continue;
-      if (!groups[provider]) groups[provider] = [];
-      groups[provider].push(model);
+      const providerRaw = model.provider || parsedProvider || "unknown";
+      const providerId = resolveProviderId(providerRaw);
+      if (!connectedProviderIds.has(providerId)) continue;
+      if (!groups[providerId]) groups[providerId] = [];
+      groups[providerId].push(model);
     }
 
     return Object.entries(groups)
@@ -1569,7 +1573,7 @@ function ProviderModelSelectionSection({ title, models, providerConnections, sel
         provider,
         models: providerModels.sort((m1, m2) => (m1.alias || m1.fullModel || "").localeCompare(m2.alias || m2.fullModel || "")),
       }));
-  }, [connectedProviders, models]);
+  }, [connectedProviderIds, models]);
 
   const [expandedProviders, setExpandedProviders] = useState({});
 
@@ -1592,7 +1596,7 @@ function ProviderModelSelectionSection({ title, models, providerConnections, sel
   return (
     <div>
       <p className="text-sm font-medium mb-2">{title}</p>
-      <div className={`max-h-64 overflow-y-auto rounded-lg border border-border p-2 space-y-2 ${enabled ? "" : "opacity-50 pointer-events-none"}`}>
+      <div className="max-h-64 overflow-y-auto rounded-lg border border-border p-2 space-y-2">
         {groupedModels.map((group) => {
           const providerSelectedCount = group.models.reduce((count, model) => {
             return count + (selectedIds.includes(model.fullModel) ? 1 : 0);
@@ -1601,6 +1605,7 @@ function ProviderModelSelectionSection({ title, models, providerConnections, sel
           const providerInfo = getProviderByAlias(group.provider);
           const providerName = providerInfo?.name || connectionNameByProvider[group.provider] || group.provider;
           const providerIcon = providerInfo?.icon || "hub";
+          const providerAlias = getProviderAlias(group.provider);
 
           return (
             <div key={group.provider} className="rounded-lg border border-black/10 dark:border-white/10 overflow-hidden">
@@ -1615,7 +1620,7 @@ function ProviderModelSelectionSection({ title, models, providerConnections, sel
                   </span>
                   <span className="material-symbols-outlined text-[18px] text-text-muted">{providerIcon}</span>
                   <span className="font-medium text-sm text-text-main">{providerName}</span>
-                  <span className="text-xs text-text-muted font-mono">({group.provider})</span>
+                  <span className="text-xs text-text-muted font-mono">({providerAlias})</span>
                 </div>
                 <span className="text-xs text-text-muted">
                   {providerSelectedCount}/{group.models.length} selected
@@ -1643,10 +1648,7 @@ function ProviderModelSelectionSection({ title, models, providerConnections, sel
           );
         })}
       </div>
-      {!enabled && (
-        <p className="text-xs text-text-muted mt-1">Switch to Restricted mode to select specific models.</p>
-      )}
-      {enabled && groupedModels.length === 0 && (
+      {groupedModels.length === 0 && (
         <p className="text-xs text-text-muted mt-1">No configured provider accounts with available models.</p>
       )}
     </div>
