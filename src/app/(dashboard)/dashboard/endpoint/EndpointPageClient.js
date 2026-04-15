@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import PropTypes from "prop-types";
 import { Card, Button, Input, Modal, CardSkeleton, Toggle } from "@/shared/components";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
+import { getProviderByAlias } from "@/shared/constants/providers";
 
 const TUNNEL_BENEFITS = [
   { icon: "public", title: "Access Anywhere", desc: "Use your API from any network" },
@@ -66,6 +67,8 @@ export default function APIPageClient({ machineId }) {
   const [editingKey, setEditingKey] = useState(null);
   const [editKeyName, setEditKeyName] = useState("");
   const [editKeyPolicy, setEditKeyPolicy] = useState(EMPTY_POLICY);
+  const [newModelRestrictionMode, setNewModelRestrictionMode] = useState("all");
+  const [editModelRestrictionMode, setEditModelRestrictionMode] = useState("all");
   const [providerConnections, setProviderConnections] = useState([]);
   const [availableModels, setAvailableModels] = useState([]);
 
@@ -570,6 +573,7 @@ export default function APIPageClient({ machineId }) {
         await fetchData();
         setNewKeyName("");
         setNewKeyPolicy(EMPTY_POLICY);
+        setNewModelRestrictionMode("all");
         setShowAddModal(false);
       }
     } catch (error) {
@@ -619,9 +623,11 @@ export default function APIPageClient({ machineId }) {
   };
 
   const handleOpenEditKey = (key) => {
+    const normalizedPolicy = normalizePolicy(key.policy || EMPTY_POLICY);
     setEditingKey(key);
     setEditKeyName(key.name || "");
-    setEditKeyPolicy(normalizePolicy(key.policy || EMPTY_POLICY));
+    setEditKeyPolicy(normalizedPolicy);
+    setEditModelRestrictionMode((normalizedPolicy.restrictions.models || []).length > 0 ? "restricted" : "all");
     setShowEditKeyModal(true);
   };
 
@@ -640,6 +646,7 @@ export default function APIPageClient({ machineId }) {
         await fetchData();
         setShowEditKeyModal(false);
         setEditingKey(null);
+        setEditModelRestrictionMode("all");
       }
     } catch (error) {
       console.log("Error updating key policy:", error);
@@ -658,6 +665,13 @@ export default function APIPageClient({ machineId }) {
       else next.add(keyId);
       return next;
     });
+  };
+
+  const handleOpenAddKeyModal = () => {
+    setNewKeyName("");
+    setNewKeyPolicy(EMPTY_POLICY);
+    setNewModelRestrictionMode("all");
+    setShowAddModal(true);
   };
 
   const [baseUrl, setBaseUrl] = useState("/v1");
@@ -872,7 +886,7 @@ export default function APIPageClient({ machineId }) {
       <Card id="require-api-key">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">API Keys</h2>
-          <Button icon="add" onClick={() => setShowAddModal(true)}>
+          <Button icon="add" onClick={handleOpenAddKeyModal}>
             Create Key
           </Button>
         </div>
@@ -897,7 +911,7 @@ export default function APIPageClient({ machineId }) {
             </div>
             <p className="text-text-main font-medium mb-1">No API keys yet</p>
             <p className="text-sm text-text-muted mb-4">Create your first API key to get started</p>
-            <Button icon="add" onClick={() => setShowAddModal(true)}>
+            <Button icon="add" onClick={handleOpenAddKeyModal}>
               Create Key
             </Button>
           </div>
@@ -993,6 +1007,7 @@ export default function APIPageClient({ machineId }) {
           setShowAddModal(false);
           setNewKeyName("");
           setNewKeyPolicy(EMPTY_POLICY);
+          setNewModelRestrictionMode("all");
         }}
       >
         <div className="flex flex-col gap-4">
@@ -1026,13 +1041,19 @@ export default function APIPageClient({ machineId }) {
                   ...prev,
                   quota: { ...prev.quota, period: e.target.value },
                 }))}
-                className="w-full h-9 px-3 rounded-lg border border-border bg-bg-subtle text-sm"
+                className={`w-full h-9 px-3 rounded-lg border border-border text-sm ${newKeyPolicy.quota.metric
+                  ? "bg-bg-subtle"
+                  : "bg-black/[0.04] dark:bg-white/[0.04] text-text-muted opacity-70 cursor-not-allowed"
+                  }`}
                 disabled={!newKeyPolicy.quota.metric}
               >
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
               </select>
+              {!newKeyPolicy.quota.metric && (
+                <p className="text-xs text-text-muted mt-1">Select Quota Metric to enable Period</p>
+              )}
             </div>
             <Input
               label="Limit"
@@ -1050,7 +1071,13 @@ export default function APIPageClient({ machineId }) {
           </div>
           <PolicySelectionSection
             title="Allowed Providers (empty = all)"
-            items={Array.from(new Set(providerConnections.map((c) => c.provider))).map((provider) => ({ id: provider, label: provider }))}
+            items={Array.from(new Set(providerConnections.map((c) => c.provider))).map((provider) => {
+              const providerInfo = getProviderByAlias(provider);
+              return {
+                id: provider,
+                label: providerInfo?.name ? `${providerInfo.name} (${provider})` : provider,
+              };
+            })}
             selected={newKeyPolicy.restrictions.providers}
             onToggle={(provider) => setNewKeyPolicy((prev) => ({
               ...prev,
@@ -1072,10 +1099,24 @@ export default function APIPageClient({ machineId }) {
               },
             }))}
           />
+          <ModelRestrictionModeSection
+            mode={newModelRestrictionMode}
+            onChange={(mode) => {
+              setNewModelRestrictionMode(mode);
+              if (mode === "all") {
+                setNewKeyPolicy((prev) => ({
+                  ...prev,
+                  restrictions: { ...prev.restrictions, models: [] },
+                }));
+              }
+            }}
+          />
           <ProviderModelSelectionSection
-            title="Allowed Models (empty = all)"
+            title="Allowed Models"
             models={availableModels}
+            providerConnections={providerConnections}
             selected={newKeyPolicy.restrictions.models}
+            enabled={newModelRestrictionMode === "restricted"}
             onToggle={(modelId) => setNewKeyPolicy((prev) => ({
               ...prev,
               restrictions: {
@@ -1093,6 +1134,7 @@ export default function APIPageClient({ machineId }) {
                 setShowAddModal(false);
                 setNewKeyName("");
                 setNewKeyPolicy(EMPTY_POLICY);
+                setNewModelRestrictionMode("all");
               }}
               variant="ghost"
               fullWidth
@@ -1111,6 +1153,7 @@ export default function APIPageClient({ machineId }) {
         onClose={() => {
           setShowEditKeyModal(false);
           setEditingKey(null);
+          setEditModelRestrictionMode("all");
         }}
       >
         <div className="flex flex-col gap-4">
@@ -1144,13 +1187,19 @@ export default function APIPageClient({ machineId }) {
                   ...prev,
                   quota: { ...prev.quota, period: e.target.value },
                 }))}
-                className="w-full h-9 px-3 rounded-lg border border-border bg-bg-subtle text-sm"
+                className={`w-full h-9 px-3 rounded-lg border border-border text-sm ${editKeyPolicy.quota.metric
+                  ? "bg-bg-subtle"
+                  : "bg-black/[0.04] dark:bg-white/[0.04] text-text-muted opacity-70 cursor-not-allowed"
+                  }`}
                 disabled={!editKeyPolicy.quota.metric}
               >
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
               </select>
+              {!editKeyPolicy.quota.metric && (
+                <p className="text-xs text-text-muted mt-1">Select Quota Metric to enable Period</p>
+              )}
             </div>
             <Input
               label="Limit"
@@ -1168,7 +1217,13 @@ export default function APIPageClient({ machineId }) {
           </div>
           <PolicySelectionSection
             title="Allowed Providers (empty = all)"
-            items={Array.from(new Set(providerConnections.map((c) => c.provider))).map((provider) => ({ id: provider, label: provider }))}
+            items={Array.from(new Set(providerConnections.map((c) => c.provider))).map((provider) => {
+              const providerInfo = getProviderByAlias(provider);
+              return {
+                id: provider,
+                label: providerInfo?.name ? `${providerInfo.name} (${provider})` : provider,
+              };
+            })}
             selected={editKeyPolicy.restrictions.providers}
             onToggle={(provider) => setEditKeyPolicy((prev) => ({
               ...prev,
@@ -1190,10 +1245,24 @@ export default function APIPageClient({ machineId }) {
               },
             }))}
           />
+          <ModelRestrictionModeSection
+            mode={editModelRestrictionMode}
+            onChange={(mode) => {
+              setEditModelRestrictionMode(mode);
+              if (mode === "all") {
+                setEditKeyPolicy((prev) => ({
+                  ...prev,
+                  restrictions: { ...prev.restrictions, models: [] },
+                }));
+              }
+            }}
+          />
           <ProviderModelSelectionSection
-            title="Allowed Models (empty = all)"
+            title="Allowed Models"
             models={availableModels}
+            providerConnections={providerConnections}
             selected={editKeyPolicy.restrictions.models}
+            enabled={editModelRestrictionMode === "restricted"}
             onToggle={(modelId) => setEditKeyPolicy((prev) => ({
               ...prev,
               restrictions: {
@@ -1210,6 +1279,7 @@ export default function APIPageClient({ machineId }) {
               onClick={() => {
                 setShowEditKeyModal(false);
                 setEditingKey(null);
+                setEditModelRestrictionMode("all");
               }}
               variant="ghost"
               fullWidth
@@ -1439,8 +1509,48 @@ function PolicySelectionSection({ title, items, selected, onToggle }) {
   );
 }
 
-function ProviderModelSelectionSection({ title, models, selected, onToggle }) {
+function ModelRestrictionModeSection({ mode, onChange }) {
+  return (
+    <div>
+      <p className="text-sm font-medium mb-2">Allowed Models</p>
+      <div className="inline-flex rounded-lg border border-border overflow-hidden">
+        <button
+          type="button"
+          className={`px-3 py-1.5 text-sm ${mode === "all" ? "bg-primary text-white" : "bg-bg-subtle text-text-main hover:bg-black/5 dark:hover:bg-white/5"}`}
+          onClick={() => onChange("all")}
+        >
+          Allow All
+        </button>
+        <button
+          type="button"
+          className={`px-3 py-1.5 text-sm border-l border-border ${mode === "restricted" ? "bg-primary text-white" : "bg-bg-subtle text-text-main hover:bg-black/5 dark:hover:bg-white/5"}`}
+          onClick={() => onChange("restricted")}
+        >
+          Restricted
+        </button>
+      </div>
+      <p className="text-xs text-text-muted mt-1">
+        {mode === "all" ? "All models are allowed." : "Only selected models are allowed."}
+      </p>
+    </div>
+  );
+}
+
+function ProviderModelSelectionSection({ title, models, providerConnections, selected, onToggle, enabled = true }) {
   const selectedIds = Array.isArray(selected) ? selected : [];
+  const connectedProviders = useMemo(
+    () => new Set((providerConnections || []).map((c) => c.provider).filter(Boolean)),
+    [providerConnections]
+  );
+  const connectionNameByProvider = useMemo(() => {
+    const map = {};
+    for (const conn of (providerConnections || [])) {
+      if (!conn?.provider || map[conn.provider]) continue;
+      map[conn.provider] = conn.name || conn.provider;
+    }
+    return map;
+  }, [providerConnections]);
+
   const groupedModels = useMemo(() => {
     const groups = {};
     for (const model of (models || [])) {
@@ -1448,6 +1558,7 @@ function ProviderModelSelectionSection({ title, models, selected, onToggle }) {
       const parts = fullModel.split("/");
       const parsedProvider = parts.length === 2 && parts[0] && parts[1] ? parts[0] : null;
       const provider = model.provider || parsedProvider || "unknown";
+      if (!connectedProviders.has(provider)) continue;
       if (!groups[provider]) groups[provider] = [];
       groups[provider].push(model);
     }
@@ -1458,7 +1569,7 @@ function ProviderModelSelectionSection({ title, models, selected, onToggle }) {
         provider,
         models: providerModels.sort((m1, m2) => (m1.alias || m1.fullModel || "").localeCompare(m2.alias || m2.fullModel || "")),
       }));
-  }, [models]);
+  }, [connectedProviders, models]);
 
   const [expandedProviders, setExpandedProviders] = useState({});
 
@@ -1478,17 +1589,18 @@ function ProviderModelSelectionSection({ title, models, selected, onToggle }) {
     });
   }, [groupedModels, selectedIds]);
 
-  if (!groupedModels.length) return null;
-
   return (
     <div>
       <p className="text-sm font-medium mb-2">{title}</p>
-      <div className="max-h-64 overflow-y-auto rounded-lg border border-border p-2 space-y-2">
+      <div className={`max-h-64 overflow-y-auto rounded-lg border border-border p-2 space-y-2 ${enabled ? "" : "opacity-50 pointer-events-none"}`}>
         {groupedModels.map((group) => {
           const providerSelectedCount = group.models.reduce((count, model) => {
             return count + (selectedIds.includes(model.fullModel) ? 1 : 0);
           }, 0);
           const isExpanded = !!expandedProviders[group.provider];
+          const providerInfo = getProviderByAlias(group.provider);
+          const providerName = providerInfo?.name || connectionNameByProvider[group.provider] || group.provider;
+          const providerIcon = providerInfo?.icon || "hub";
 
           return (
             <div key={group.provider} className="rounded-lg border border-black/10 dark:border-white/10 overflow-hidden">
@@ -1501,7 +1613,9 @@ function ProviderModelSelectionSection({ title, models, selected, onToggle }) {
                   <span className={`material-symbols-outlined text-[18px] text-text-muted transition-transform ${isExpanded ? "rotate-90" : ""}`}>
                     chevron_right
                   </span>
-                  <span className="font-medium text-sm text-text-main">{group.provider}</span>
+                  <span className="material-symbols-outlined text-[18px] text-text-muted">{providerIcon}</span>
+                  <span className="font-medium text-sm text-text-main">{providerName}</span>
+                  <span className="text-xs text-text-muted font-mono">({group.provider})</span>
                 </div>
                 <span className="text-xs text-text-muted">
                   {providerSelectedCount}/{group.models.length} selected
@@ -1529,6 +1643,12 @@ function ProviderModelSelectionSection({ title, models, selected, onToggle }) {
           );
         })}
       </div>
+      {!enabled && (
+        <p className="text-xs text-text-muted mt-1">Switch to Restricted mode to select specific models.</p>
+      )}
+      {enabled && groupedModels.length === 0 && (
+        <p className="text-xs text-text-muted mt-1">No configured provider accounts with available models.</p>
+      )}
     </div>
   );
 }
