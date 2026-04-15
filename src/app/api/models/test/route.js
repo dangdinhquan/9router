@@ -1,14 +1,29 @@
 import { NextResponse } from "next/server";
 import { getApiKeys } from "@/lib/localDb";
 
+async function fetchWithBaseUrlFallback(request, endpoint, options) {
+  const reqUrl = new URL(request.url);
+  const requestBaseUrl = `${reqUrl.protocol}//${reqUrl.host}`;
+  const fallbackBaseUrl = process.env.BASE_URL;
+  const candidates = [...new Set([requestBaseUrl, fallbackBaseUrl].filter(Boolean))];
+
+  let lastError = null;
+  for (const baseUrl of candidates) {
+    try {
+      return await fetch(`${baseUrl}${endpoint}`, options);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("Failed to connect to internal API");
+}
+
 // POST /api/models/test - Ping a single model via internal completions or embeddings
 export async function POST(request) {
   try {
     const { model, kind } = await request.json();
     if (!model) return NextResponse.json({ error: "Model required" }, { status: 400 });
-
-    const baseUrl = process.env.BASE_URL ||
-      (() => { const u = new URL(request.url); return `${u.protocol}//${u.host}`; })();
 
     // Get an active internal API key for auth (if requireApiKey is enabled)
     let apiKey = null;
@@ -24,7 +39,7 @@ export async function POST(request) {
 
     // Route to appropriate endpoint based on kind
     if (kind === "embedding") {
-      const res = await fetch(`${baseUrl}/api/v1/embeddings`, {
+      const res = await fetchWithBaseUrlFallback(request, "/api/v1/embeddings", {
         method: "POST",
         headers,
         body: JSON.stringify({ model, input: "test" }),
@@ -47,7 +62,7 @@ export async function POST(request) {
     }
 
     // Default: chat completions
-    const res = await fetch(`${baseUrl}/api/v1/chat/completions`, {
+    const res = await fetchWithBaseUrlFallback(request, "/api/v1/chat/completions", {
       method: "POST",
       headers,
       body: JSON.stringify({

@@ -99,7 +99,16 @@ RouterNode.propTypes = {
 const nodeTypes = { provider: ProviderNode, router: RouterNode };
 
 // Place N nodes evenly along an ellipse around the router center.
-function buildLayout(providers, activeSet, lastSet, errorSet) {
+function getProviderRequestCount(provider, providerRequestCounts = {}) {
+  if (!provider) return 0;
+  return Number(
+    providerRequestCounts[provider]
+    ?? providerRequestCounts[provider.toLowerCase?.() || provider]
+    ?? 0
+  ) || 0;
+}
+
+function buildLayout(providers, activeSet, lastSet, errorSet, providerRequestCounts = {}) {
   const nodeW = 180;
   const nodeH = 30;
   const routerW = 120;
@@ -130,11 +139,18 @@ function buildLayout(providers, activeSet, lastSet, errorSet) {
     draggable: false,
   });
 
-  const edgeStyle = (active, last, error, color) => {
+  const maxRequests = Math.max(1, ...providers.map((p) => getProviderRequestCount(p.provider, providerRequestCounts)));
+
+  const edgeStyle = (active, last, error, color, requestCount) => {
+    const normalized = Math.max(0, Math.min(1, requestCount / maxRequests));
+    const baseStrokeWidth = 1 + (normalized * 4);
+    const baseOpacity = 0.2 + (normalized * 0.7);
+
     if (error) return { stroke: "#ef4444", strokeWidth: 2.5, opacity: 0.9 };
     if (active) return { stroke: "#22c55e", strokeWidth: 2.5, opacity: 0.9 };
-    if (last) return { stroke: "#f59e0b", strokeWidth: 2, opacity: 0.7 };
-    return { stroke: "var(--color-border)", strokeWidth: 1, opacity: 0.3 };
+    if (last) return { stroke: "#f59e0b", strokeWidth: Math.max(2, baseStrokeWidth), opacity: Math.max(0.7, baseOpacity) };
+    if (requestCount > 0) return { stroke: color || "var(--color-border)", strokeWidth: baseStrokeWidth, opacity: baseOpacity };
+    return { stroke: "var(--color-border)", strokeWidth: 1, opacity: 0.2 };
   };
 
   providers.forEach((p, i) => {
@@ -142,6 +158,7 @@ function buildLayout(providers, activeSet, lastSet, errorSet) {
     const active = activeSet.has(p.provider?.toLowerCase());
     const last = !active && lastSet.has(p.provider?.toLowerCase());
     const error = !active && errorSet.has(p.provider?.toLowerCase());
+    const requestCount = getProviderRequestCount(p.provider, providerRequestCounts);
     const nodeId = `provider-${p.provider}`;
     const data = {
       label: (config.name !== p.provider ? config.name : null) || p.name || p.provider,
@@ -183,14 +200,14 @@ function buildLayout(providers, activeSet, lastSet, errorSet) {
       target: nodeId,
       targetHandle,
       animated: active,
-      style: edgeStyle(active, last, error, config.color),
+      style: edgeStyle(active, last, error, config.color, requestCount),
     });
   });
 
   return { nodes, edges };
 }
 
-export default function ProviderTopology({ providers = [], activeRequests = [], lastProvider = "", errorProvider = "" }) {
+export default function ProviderTopology({ providers = [], activeRequests = [], lastProvider = "", errorProvider = "", providerRequestCounts = {} }) {
   // Serialize to stable string keys so useMemo only re-runs when values actually change
   const activeKey = useMemo(
     () => activeRequests.map((r) => r.provider?.toLowerCase()).filter(Boolean).sort().join(","),
@@ -204,8 +221,8 @@ export default function ProviderTopology({ providers = [], activeRequests = [], 
   const errorSet = useMemo(() => new Set(errorKey ? [errorKey] : []), [errorKey]);
 
   const { nodes, edges } = useMemo(
-    () => buildLayout(providers, activeSet, lastSet, errorSet),
-    [providers, activeKey, lastKey, errorKey]
+    () => buildLayout(providers, activeSet, lastSet, errorSet, providerRequestCounts),
+    [providers, activeKey, lastKey, errorKey, providerRequestCounts]
   );
 
   // Stable key — only remount when provider list changes
@@ -263,4 +280,5 @@ ProviderTopology.propTypes = {
   })),
   lastProvider: PropTypes.string,
   errorProvider: PropTypes.string,
+  providerRequestCounts: PropTypes.object,
 };

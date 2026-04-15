@@ -400,6 +400,16 @@ export default function UsageStats() {
     }
   }, [stats, tableView, sortBy, sortOrder]);
 
+  const providerRequestCounts = useMemo(() => {
+    const byProvider = stats?.byProvider || {};
+    return Object.entries(byProvider).reduce((acc, [provider, usage]) => {
+      if (!provider) return acc;
+      acc[provider] = usage?.requests || 0;
+      acc[provider.toLowerCase()] = usage?.requests || 0;
+      return acc;
+    }, {});
+  }, [stats?.byProvider]);
+
   if (!stats && !loading) return <div className="text-text-muted">Failed to load usage statistics.</div>;
 
   const spinner = (
@@ -452,6 +462,7 @@ export default function UsageStats() {
             activeRequests={stats.activeRequests || []}
             lastProvider={stats.recentRequests?.[0]?.provider || ""}
             errorProvider={stats.errorProvider || ""}
+            providerRequestCounts={providerRequestCounts}
           />
           <RecentRequests requests={stats.recentRequests || []} />
         </div>
