@@ -56,6 +56,15 @@ function hasKeyPolicyRestrictions(key) {
   );
 }
 
+function formatQuotaLimit(quota) {
+  if (!quota?.metric || !Number.isFinite(Number(quota?.limit)) || Number(quota.limit) <= 0) {
+    return null;
+  }
+  const period = quota.period || "daily";
+  if (quota.metric === "cost") return `$${Number(quota.limit)}/${period}`;
+  return `${Number(quota.limit).toLocaleString()}/${period}`;
+}
+
 export default function APIPageClient({ machineId }) {
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -951,12 +960,9 @@ export default function APIPageClient({ machineId }) {
                   </p>
                   {hasKeyPolicyRestrictions(key) && (
                     <p className="text-xs text-text-muted mt-1">
-                      Policy: {(key.policy?.quota?.metric && key.policy?.quota?.limit)
-                        ? `${key.policy.quota.metric}/${key.policy.quota.period}`
-                        : "no quota"}
-                      {` • providers ${key.policy?.restrictions?.providers?.length || 0}`}
-                      {` • accounts ${key.policy?.restrictions?.connectionIds?.length || 0}`}
-                      {` • models ${key.policy?.restrictions?.models?.length || 0}`}
+                      {`Limit: ${formatQuotaLimit(key.policy?.quota) || "No Limit"}`}
+                      {(key.policy?.restrictions?.models?.length || 0) > 0 &&
+                        ` • Models: ${key.policy.restrictions.models.length}`}
                     </p>
                   )}
                   {key.isActive === false && (
@@ -1069,36 +1075,6 @@ export default function APIPageClient({ machineId }) {
               placeholder={newKeyPolicy.quota.metric === "cost" ? "e.g. 5" : "e.g. 100000"}
             />
           </div>
-          <PolicySelectionSection
-            title="Allowed Providers (empty = all)"
-            items={Array.from(new Set(providerConnections.map((c) => c.provider))).map((provider) => {
-              const providerInfo = getProviderByAlias(provider);
-              return {
-                id: provider,
-                label: providerInfo?.name ? `${providerInfo.name} (${provider})` : provider,
-              };
-            })}
-            selected={newKeyPolicy.restrictions.providers}
-            onToggle={(provider) => setNewKeyPolicy((prev) => ({
-              ...prev,
-              restrictions: {
-                ...prev.restrictions,
-                providers: toggleSelection(prev.restrictions.providers, provider),
-              },
-            }))}
-          />
-          <PolicySelectionSection
-            title="Allowed Provider Accounts (empty = all)"
-            items={providerConnections.map((conn) => ({ id: conn.id, label: `${conn.name || conn.email || conn.id} (${conn.provider})` }))}
-            selected={newKeyPolicy.restrictions.connectionIds}
-            onToggle={(connectionId) => setNewKeyPolicy((prev) => ({
-              ...prev,
-              restrictions: {
-                ...prev.restrictions,
-                connectionIds: toggleSelection(prev.restrictions.connectionIds, connectionId),
-              },
-            }))}
-          />
           <ModelRestrictionModeSection
             mode={newModelRestrictionMode}
             onChange={(mode) => {
@@ -1216,36 +1192,6 @@ export default function APIPageClient({ machineId }) {
               placeholder={editKeyPolicy.quota.metric === "cost" ? "e.g. 5" : "e.g. 100000"}
             />
           </div>
-          <PolicySelectionSection
-            title="Allowed Providers (empty = all)"
-            items={Array.from(new Set(providerConnections.map((c) => c.provider))).map((provider) => {
-              const providerInfo = getProviderByAlias(provider);
-              return {
-                id: provider,
-                label: providerInfo?.name ? `${providerInfo.name} (${provider})` : provider,
-              };
-            })}
-            selected={editKeyPolicy.restrictions.providers}
-            onToggle={(provider) => setEditKeyPolicy((prev) => ({
-              ...prev,
-              restrictions: {
-                ...prev.restrictions,
-                providers: toggleSelection(prev.restrictions.providers, provider),
-              },
-            }))}
-          />
-          <PolicySelectionSection
-            title="Allowed Provider Accounts (empty = all)"
-            items={providerConnections.map((conn) => ({ id: conn.id, label: `${conn.name || conn.email || conn.id} (${conn.provider})` }))}
-            selected={editKeyPolicy.restrictions.connectionIds}
-            onToggle={(connectionId) => setEditKeyPolicy((prev) => ({
-              ...prev,
-              restrictions: {
-                ...prev.restrictions,
-                connectionIds: toggleSelection(prev.restrictions.connectionIds, connectionId),
-              },
-            }))}
-          />
           <ModelRestrictionModeSection
             mode={editModelRestrictionMode}
             onChange={(mode) => {
@@ -1485,28 +1431,6 @@ export default function APIPageClient({ machineId }) {
           </div>
         </div>
       </Modal>
-    </div>
-  );
-}
-
-function PolicySelectionSection({ title, items, selected, onToggle }) {
-  if (!items?.length) return null;
-  const selectedIds = Array.isArray(selected) ? selected : [];
-  return (
-    <div>
-      <p className="text-sm font-medium mb-2">{title}</p>
-      <div className="max-h-28 overflow-y-auto rounded-lg border border-border p-2 space-y-1">
-        {items.map((item) => (
-          <label key={item.id} className="flex items-center gap-2 text-sm text-text-main">
-            <input
-              type="checkbox"
-              checked={selectedIds.includes(item.id)}
-              onChange={() => onToggle(item.id)}
-            />
-            <span>{item.label}</span>
-          </label>
-        ))}
-      </div>
     </div>
   );
 }
